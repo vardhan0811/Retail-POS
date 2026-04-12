@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Workaround: some machines have incomplete workload locator SDK folders, which breaks restore -->
+    <MSBuildEnableWorkloadResolver>false</MSBuildEnableWorkloadResolver>
+    <!-- Also avoid NuGet static-graph restore issues -->
+    <RestoreUseStaticGraphEvaluation>false</RestoreUseStaticGraphEvaluation>
+  </PropertyGroup>
+</Project>
+

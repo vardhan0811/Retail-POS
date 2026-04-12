@@ -1,0 +1,15 @@
+﻿using AuthService.Entities;
+
+namespace AuthService.Repositories
+{
+    public interface IUserRepository
+    {
+        Task<User?> GetByEmailAsync(string email);
+        Task<bool> ExistsByEmailAsync(string email);
+        Task<User?> GetByIdAsync(Guid id);
+        Task AddAsync(User user);
+        Task UpdateAsync(User user);
+        Task<User?> GetUserWithRoleAndPermissions(string email);
+        Task<User?> GetUserWithRoleAndPermissionsById(Guid id);
+    }
+}

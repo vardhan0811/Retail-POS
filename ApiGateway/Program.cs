@@ -1,0 +1,85 @@
+using ApiGateway.HealthChecks;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
+using Ocelot.DependencyInjection;
+using Ocelot.Middleware;
+using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
+builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
+
+// Add CORS policy
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy => policy
+            .WithOrigins("http://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials() // Only if you need cookies
+    );
+});
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    var localPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.Local.json");
+    throw new InvalidOperationException($"Missing config: Jwt:Key. Put it in '{localPath}' (gitignored).");
+}
+var issuer = builder.Configuration["Jwt:Issuer"]
+    ?? throw new InvalidOperationException("Missing config: Jwt:Issuer");
+var audience = builder.Configuration["Jwt:Audience"]
+    ?? throw new InvalidOperationException("Missing config: Jwt:Audience");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddOcelot();
+builder.Services.AddHealthChecks();
+
+var app = builder.Build();
+
+// Use CORS
+app.UseCors("AllowFrontend");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Put /health on a separate branch so Ocelot can't intercept it.
+app.Map("/health", healthApp =>
+{
+    healthApp.Run(async ctx =>
+    {
+        var report = await ctx.RequestServices.GetRequiredService<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckService>()
+            .CheckHealthAsync(ctx.RequestAborted);
+
+        ctx.Response.ContentType = "application/json";
+        ctx.Response.StatusCode = report.Status == Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status503ServiceUnavailable;
+
+        await HealthCheckResponseWriter.WriteAsync(ctx, report);
+    });
+});
+
+app.MapGet("/", () => Results.Redirect("/health")).AllowAnonymous();
+
+await app.UseOcelot();
+
+app.Run();

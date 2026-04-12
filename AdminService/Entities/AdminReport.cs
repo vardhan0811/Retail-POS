@@ -1,0 +1,12 @@
+namespace AdminService.Entities
+{
+    public class AdminReport
+    {
+        public Guid Id { get; set; }
+        public string ReportType { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public string Data { get; set; } = string.Empty; // JSON or CSV
+        public Guid UserId { get; set; } // Foreign key
+        public User User { get; set; } = null!;
+    }
+}

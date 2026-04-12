@@ -1,0 +1,22 @@
+using System.Net.Mail;
+using AuthService.Middleware;
+
+namespace AuthService.Utils
+{
+    public static class EmailValidator
+    {
+        public static void ValidateEmail(string email)
+        {
+            // Step 1: Basic input validation
+            if (string.IsNullOrWhiteSpace(email))
+                throw new BusinessException("Email is required.");
+
+            // Step 2: Normalize input
+            email = email.Trim();
+
+            // Step 3: Parse & validate structure
+            if (!MailAddress.TryCreate(email, out var parsedEmail))
+                throw new BusinessException("Invalid email format.");
+        }
+    }
+}

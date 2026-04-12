@@ -1,0 +1,46 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace AuthService.DTOs
+{
+    public class ForgotPasswordRequest
+    {
+        [Required]
+        [EmailAddress]
+        [MaxLength(256)]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class ResetPasswordRequest
+    {
+        [Required]
+        [EmailAddress]
+        [MaxLength(256)]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [RegularExpression("^[0-9]{6}$")]
+        public string Otp { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(8)]
+        [MaxLength(128)]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [Required]
+        [Compare("NewPassword", ErrorMessage = "ConfirmPassword must match NewPassword")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    public class ChangePasswordRequest
+    {
+        [Required]
+        [MinLength(8)]
+        [MaxLength(128)]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(8)]
+        [MaxLength(128)]
+        public string NewPassword { get; set; } = string.Empty;
+    }
+}

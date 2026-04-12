@@ -1,0 +1,98 @@
+using AdminService.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using AdminService.DTOs;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("api/admin/users")]
+    [Authorize]
+    public class UserController : ControllerBase
+    {
+        private readonly IUserService _service;
+        public UserController(IUserService service) { _service = service; }
+
+        [Authorize(Policy = "VIEW_ADMIN_READ")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] Guid? storeId = null, [FromQuery] string? role = null, [FromQuery] bool? isActive = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var result = await _service.GetPagedAsync(storeId, role, isActive, page, pageSize);
+
+            return Ok(new ApiResponse<PagedResult<UserDto>>
+            {
+                Success = true,
+                Message = "Users fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_ADMIN_READ")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var user = await _service.GetByIdAsync(id);
+            if (user == null)
+                return NotFound(new ApiResponse<UserDto>
+                {
+                    Success = false,
+                    Message = "User not found",
+                    Data = null
+                });
+
+            var dto = new UserDto
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+                Role = user.Role,
+                IsActive = user.IsActive,
+                StoreId = user.StoreId
+            };
+
+            return Ok(new ApiResponse<UserDto>
+            {
+                Success = true,
+                Message = "User fetched successfully",
+                Data = dto
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpPut("{id}/role")]
+        public async Task<IActionResult> UpdateRole(Guid id, [FromBody] UpdateUserRoleRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid request", Data = ModelState });
+
+            var dto = await _service.UpdateRoleAsync(id, request);
+
+            return Ok(new ApiResponse<UserDto>
+            {
+                Success = true,
+                Message = "User role updated successfully",
+                Data = dto
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpPut("{id}/status")]
+        public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateUserStatusRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid request", Data = ModelState });
+
+            var dto = await _service.UpdateStatusAsync(id, request);
+
+            return Ok(new ApiResponse<UserDto>
+            {
+                Success = true,
+                Message = "User status updated successfully",
+                Data = dto
+            });
+        }
+    }
+}

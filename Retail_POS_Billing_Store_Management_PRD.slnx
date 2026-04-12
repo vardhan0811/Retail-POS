@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="AdminService/AdminService.csproj" />
+  <Project Path="ApiGateway/ApiGateway.csproj" />
+  <Project Path="AuthService/AuthService.csproj" />
+  <Project Path="BillingService/BillingService.csproj" />
+  <Project Path="NotificationService/NotificationService.csproj" Id="c87ecd4e-32be-46ff-847b-141268739d67" />
+  <Project Path="ProductService/ProductService.csproj" />
+  <Project Path="Shared.Contracts/Shared.Contracts.csproj" Id="bff5b2aa-8b8d-44a0-96f0-f9a6dbc1bf3d" />
+  <Project Path="Shared.Messaging/Shared.Messaging.csproj" />
+</Solution>
