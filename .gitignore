@@ -18,6 +18,9 @@
 *.log
 
 
-# Ignore .github folder
+
+# Ignore .github, .vs, and .vscode folders
 .github/
+.vs/
+.vscode/
 
