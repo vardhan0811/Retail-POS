@@ -1,0 +1,18 @@
+﻿using AdminService.Entities;
+using AdminService.Repositories;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace AdminService.Services
+{
+    public class UserService : IUserService
+    {
+        private readonly IUserRepository _repo;
+        public UserService(IUserRepository repo) { _repo = repo; }
+        public async Task<User> GetByIdAsync(Guid id) => await _repo.GetByIdAsync(id);
+        public async Task<IEnumerable<User>> GetAllAsync() => await _repo.GetAllAsync();
+        public async Task AddAsync(User user) => await _repo.AddAsync(user);
+        public async Task UpdateAsync(User user) => await _repo.UpdateAsync(user);
+        public async Task DeleteAsync(Guid id) => await _repo.DeleteAsync(id);
+    }
+}

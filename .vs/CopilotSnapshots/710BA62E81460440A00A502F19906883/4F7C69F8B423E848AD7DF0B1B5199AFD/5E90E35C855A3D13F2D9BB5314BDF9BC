@@ -1,0 +1,9 @@
+﻿using Microsoft.Extensions.Configuration;
+
+namespace ProductService.Services
+{
+    public sealed class RabbitMqPublisher : RabbitMqPublisherBase
+    {
+        public RabbitMqPublisher(IConfiguration config) : base(config) { }
+    }
+}

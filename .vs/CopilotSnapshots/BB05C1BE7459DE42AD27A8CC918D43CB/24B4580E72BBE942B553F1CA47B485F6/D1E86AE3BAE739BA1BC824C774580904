@@ -1,0 +1,65 @@
+﻿using AdminService.Data;
+using AdminService.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Shared.Contracts.Events;
+using System;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Shared.Messaging.RabbitMq;
+
+namespace AdminService.Services
+{
+    public sealed class StoreCreatedConsumerHostedService : RabbitMqConsumerBase
+    {
+        private readonly IServiceScopeFactory _scopeFactory;
+
+        public StoreCreatedConsumerHostedService(
+            IConfiguration config,
+            ILogger<StoreCreatedConsumerHostedService> logger,
+            IServiceScopeFactory scopeFactory)
+            : base(config, logger, "admin.store.created", "store.created")
+        {
+            _scopeFactory = scopeFactory;
+        }
+
+        protected override async Task ProcessMessageAsync(byte[] body, string routingKey, CancellationToken ct)
+        {
+            var json = Encoding.UTF8.GetString(body);
+
+            var evt = JsonSerializer.Deserialize<StoreCreatedEvent>(
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? throw new InvalidOperationException("Failed to deserialize StoreCreatedEvent.");
+
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
+
+            var existing = await db.Stores.FirstOrDefaultAsync(s => s.Id == evt.StoreId, ct);
+            if (existing == null)
+            {
+                db.Stores.Add(new Store
+                {
+                    Id = evt.StoreId,
+                    Name = evt.Name,
+                    Location = evt.Location,
+                    Address = string.Empty,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = evt.IsActive
+                });
+            }
+            else
+            {
+                existing.Name = evt.Name;
+                existing.Location = evt.Location;
+                existing.IsActive = evt.IsActive;
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+    }
+}

@@ -1,0 +1,11 @@
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace AuthService.DTOs
+{
+    public class UserDeactivateRequest
+    {
+        [Required]
+        [NotEmptyGuid(ErrorMessage = "UserId is required")]
+        public Guid UserId { get; set; }
+    }
+}

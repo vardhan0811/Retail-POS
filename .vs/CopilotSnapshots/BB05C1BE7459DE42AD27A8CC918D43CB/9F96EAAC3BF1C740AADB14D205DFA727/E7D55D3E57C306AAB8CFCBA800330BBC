@@ -1,0 +1,83 @@
+﻿using AdminService.Entities;
+using AdminService.Repositories;
+using AdminService.DTOs;
+using AdminService.Middleware;
+using Shared.Contracts.Events;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace AdminService.Services
+{
+    public class UserService : IUserService
+    {
+        private readonly IUserRepository _repo;
+
+        public UserService(IUserRepository repo)
+        {
+            _repo = repo;
+        }
+
+        public async Task<User?> GetByIdAsync(Guid id) => await _repo.GetByIdAsync(id);
+
+        public async Task<IEnumerable<User>> GetAllAsync() => await _repo.GetAllAsync();
+
+        public async Task<User> UpdateRoleAsync(Guid id, UpdateUserRoleRequest request)
+        {
+            if (id == Guid.Empty)
+                throw new BusinessException("User id is required");
+            if (request == null || string.IsNullOrWhiteSpace(request.Role))
+                throw new BusinessException("Role is required");
+
+            var user = await _repo.GetByIdAsync(id);
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            user.Role = request.Role.Trim();
+            await _repo.UpdateAsync(user);
+            return user;
+        }
+
+        public async Task<User> UpdateStatusAsync(Guid id, UpdateUserStatusRequest request)
+        {
+            if (id == Guid.Empty)
+                throw new BusinessException("User id is required");
+            if (request == null)
+                throw new BusinessException("Status request is required");
+
+            var user = await _repo.GetByIdAsync(id);
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            user.IsActive = request.IsActive;
+            await _repo.UpdateAsync(user);
+            return user;
+        }
+
+        public async Task HandleUserCreatedEventAsync(UserCreatedEvent evt)
+        {
+            var existing = await _repo.GetByIdAsync(evt.UserId);
+
+            if (existing == null)
+            {
+                await _repo.AddAsync(new User
+                {
+                    Id = evt.UserId,
+                    UserName = evt.UserName,
+                    Email = evt.Email,
+                    Role = evt.Role,
+                    IsActive = true,
+                    StoreId = Guid.Empty
+                });
+                return;
+            }
+
+            existing.UserName = evt.UserName;
+            existing.Email = evt.Email;
+            existing.Role = evt.Role;
+            existing.IsActive = true;
+
+            await _repo.UpdateAsync(existing);
+        }
+    }
+}

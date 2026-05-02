@@ -1,0 +1,44 @@
+﻿using AdminService.Data;
+using AdminService.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace AdminService.Repositories
+{
+    public class StoreRepository : IStoreRepository
+    {
+        private readonly AdminDbContext _context;
+
+        public StoreRepository(AdminDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<List<Store>> GetAllAsync()
+        {
+            return await _context.Stores.AsNoTracking().ToListAsync();
+        }
+
+        public async Task<Store?> GetByIdAsync(Guid id)
+        {
+            return await _context.Stores.FirstOrDefaultAsync(s => s.Id == id);
+        }
+
+        public async Task AddAsync(Store store)
+        {
+            await _context.Stores.AddAsync(store);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateAsync(Store store)
+        {
+            _context.Stores.Update(store);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(Store store)
+        {
+            _context.Stores.Remove(store);
+            await _context.SaveChangesAsync();
+        }
+    }
+}

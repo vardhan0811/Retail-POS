@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using BillingService.DTOs;
 using Microsoft.AspNetCore.Http;
 using System.Net;
@@ -58,6 +58,31 @@ namespace BillingService.Services
                 using var response = await _httpClient.SendAsync(request, ct);
                 if (response.StatusCode == HttpStatusCode.Forbidden)
                     throw new ForbiddenException("Not allowed to update product stock");
+                response.EnsureSuccessStatusCode();
+                return true;
+            });
+        }
+
+        public async Task FinalizeStockAsync(Guid storeId, List<(Guid ProductId, int Quantity)> items)
+        {
+            await RetryAsync(async ct =>
+            {
+                var body = new
+                {
+                    storeId,
+                    items = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity }).ToList()
+                };
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, "api/products/finalize-stock")
+                {
+                    Content = JsonContent.Create(body)
+                };
+                AttachAuthorization(request);
+
+                using var response = await _httpClient.SendAsync(request, ct);
+                if (response.StatusCode == HttpStatusCode.Forbidden)
+                    throw new ForbiddenException("Not allowed to finalize stock");
+                
                 response.EnsureSuccessStatusCode();
                 return true;
             });

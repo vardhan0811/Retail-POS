@@ -1,0 +1,91 @@
+.admin-shell {
+	height: 100vh;
+}
+
+.admin-content {
+	padding: 24px;
+	min-height: calc(100vh - 56px);
+	background: var(--mat-sys-surface, #0b1220);
+	color: var(--mat-sys-on-surface, #e5e7eb);
+}
+
+.spacer {
+	flex: 1 1 auto;
+}
+
+.admin-topbar {
+	background: var(--mat-sys-surface-container, #0f172a);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	color: var(--mat-sys-on-surface, #e5e7eb);
+	height: 56px;
+	padding: 0 16px;
+}
+
+.topbar-left,
+.topbar-right {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.page-title {
+	font-size: 18px;
+	font-weight: 600;
+	letter-spacing: 0.2px;
+}
+
+.role-chip {
+	font-size: 12px;
+	line-height: 1;
+	padding: 6px 10px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.04);
+	color: rgba(255, 255, 255, 0.82);
+}
+
+// Content container (max-width + comfortable margins)
+:host ::ng-deep .admin-content > * {
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+// Sidebar + nav list refinement
+:host ::ng-deep .mat-sidenav {
+	width: 260px;
+	background: var(--mat-sys-surface-container, #0f172a);
+	border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+:host ::ng-deep .mat-mdc-nav-list {
+	padding-top: 8px;
+}
+
+:host ::ng-deep a.mat-mdc-list-item,
+:host ::ng-deep button.mat-mdc-list-item {
+	margin: 2px 8px;
+	border-radius: 10px;
+}
+
+:host ::ng-deep a.mat-mdc-list-item .mdc-list-item__primary-text,
+:host ::ng-deep button.mat-mdc-list-item .mdc-list-item__primary-text {
+	font-size: 13px;
+	font-weight: 500;
+}
+
+:host ::ng-deep .mat-mdc-list-item .mat-icon {
+	font-size: 20px;
+	width: 20px;
+	height: 20px;
+	opacity: 0.86;
+}
+
+:host ::ng-deep .active-link {
+	background: rgba(0, 188, 212, 0.14); // primary accent only
+}
+
+// Make logout visually separate (bottom-ish + divider spacing)
+:host ::ng-deep .mat-mdc-nav-list mat-divider {
+	margin: 8px 12px;
+	border-top-color: rgba(255, 255, 255, 0.08);
+}

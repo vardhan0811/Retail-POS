@@ -1,0 +1,92 @@
+﻿using Microsoft.Extensions.Hosting;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using BillingService.Events;
+using BillingService.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace BillingService.Services
+{
+    public class RabbitMqConsumerHostedService : BackgroundService
+    {
+        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ILogger<RabbitMqConsumerHostedService> _logger;
+        private IConnection _connection;
+        private IModel _channel;
+
+        public RabbitMqConsumerHostedService(IServiceScopeFactory scopeFactory, ILogger<RabbitMqConsumerHostedService> logger)
+        {
+            _scopeFactory = scopeFactory;
+            _logger = logger;
+            var factory = new ConnectionFactory { HostName = "localhost", UserName = "guest", Password = "guest" };
+            _connection = factory.CreateConnection();
+            _channel = _connection.CreateModel();
+        }
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            _channel.QueueDeclare("stock-reserved", durable: true, exclusive: false, autoDelete: false, arguments: null);
+            _channel.QueueDeclare("stock-failed", durable: true, exclusive: false, autoDelete: false, arguments: null);
+            var consumer = new EventingBasicConsumer(_channel);
+            consumer.Received += async (model, ea) =>
+            {
+                var body = ea.Body.ToArray();
+                var message = Encoding.UTF8.GetString(body);
+                _logger.LogInformation("[BillingService Consumer] Received: {msg}", message);
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+
+                    if (ea.RoutingKey == "stock-reserved")
+                    {
+                        var evt = JsonSerializer.Deserialize<StockReservedEvent>(message);
+                        if (evt != null)
+                        {
+                            var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == evt.BillId);
+                            if (bill != null)
+                            {
+                                bill.Status = "Completed";
+                                await db.SaveChangesAsync();
+                            }
+                        }
+                    }
+                    else if (ea.RoutingKey == "stock-failed")
+                    {
+                        var evt = JsonSerializer.Deserialize<StockFailedEvent>(message);
+                        if (evt != null)
+                        {
+                            var bill = await db.Bills.FirstOrDefaultAsync(b => b.Id == evt.BillId);
+                            if (bill != null)
+                            {
+                                bill.Status = "Failed";
+                                await db.SaveChangesAsync();
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing stock message");
+                }
+                _channel.BasicAck(ea.DeliveryTag, false);
+            };
+            _channel.BasicConsume(queue: "stock-reserved", autoAck: false, consumer: consumer);
+            _channel.BasicConsume(queue: "stock-failed", autoAck: false, consumer: consumer);
+            return Task.CompletedTask;
+        }
+
+        public override void Dispose()
+        {
+            _channel?.Dispose();
+            _connection?.Dispose();
+            base.Dispose();
+        }
+    }
+}

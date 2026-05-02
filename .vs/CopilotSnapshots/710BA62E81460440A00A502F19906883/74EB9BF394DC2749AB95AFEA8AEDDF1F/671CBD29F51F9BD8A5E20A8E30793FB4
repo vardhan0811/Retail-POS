@@ -1,0 +1,69 @@
+﻿using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using System.Text;
+using System.Text.Json;
+using BillingService.Data;
+using BillingService.Events;
+
+namespace BillingService.Services
+{
+    public class RabbitMqConsumer
+    {
+        private readonly IServiceScopeFactory _scopeFactory;
+
+        public RabbitMqConsumer(IServiceScopeFactory scopeFactory)
+        {
+            _scopeFactory = scopeFactory;
+        }
+
+        public void Start()
+        {
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            var connection = factory.CreateConnection();
+            var channel = connection.CreateModel();
+
+            channel.QueueDeclare("stock-reserved", true, false, false, null);
+            channel.QueueDeclare("stock-failed", true, false, false, null);
+
+            var consumer = new EventingBasicConsumer(channel);
+
+            consumer.Received += (model, ea) =>
+            {
+                var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+
+                if (ea.RoutingKey == "stock-reserved")
+                {
+                    var evt = JsonSerializer.Deserialize<StockReservedEvent>(json);
+
+
+                    var bill = db.Bills.FirstOrDefault(x => x.Id == evt.BillId);
+                    if (bill != null)
+                    {
+                        bill.Status = "COMPLETED";
+                        db.SaveChanges();
+                    }
+                }
+
+                if (ea.RoutingKey == "stock-failed")
+                {
+                    var evt = JsonSerializer.Deserialize<StockFailedEvent>(json);
+
+                    var bill = db.Bills.FirstOrDefault(x => x.Id == evt.BillId);
+                    if (bill != null)
+                    {
+                        bill.Status = "FAILED";
+                        db.SaveChanges();
+                    }
+                }
+
+                channel.BasicAck(ea.DeliveryTag, false);
+            };
+
+            channel.BasicConsume("stock-reserved", false, consumer);
+            channel.BasicConsume("stock-failed", false, consumer);
+        }
+    }
+}

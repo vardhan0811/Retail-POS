@@ -1,0 +1,132 @@
+.login-container {
+  min-height: 100vh;
+  background-color: #0f172a; // Deep slate
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+}
+
+.login-wrapper {
+  width: 100%;
+  max-width: 440px;
+}
+
+.login-card {
+  border-radius: 16px;
+  border: 1px solid #1e293b;
+  background-color: rgba(15, 23, 42, 0.7);
+  padding: 40px 32px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+}
+
+.login-header {
+  margin-bottom: 32px;
+  text-align: center;
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: #f8fafc;
+  }
+
+  p {
+    margin: 8px 0 0 0;
+    font-size: 15px;
+    color: #94a3b8;
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+
+  label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #cbd5e1;
+    margin-bottom: 8px;
+  }
+
+  input {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    background-color: #020617;
+    padding: 12px 16px;
+    font-size: 15px;
+    color: #f8fafc;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+
+    &::placeholder {
+      color: #475569;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: #06b6d4; // Cyan focus
+      box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+    }
+  }
+}
+
+.validation-error {
+  margin: 6px 0 0 0;
+  font-size: 13px;
+  color: #fb7185; // Rose color
+}
+
+.error-message {
+  border-radius: 10px;
+  border: 1px solid rgba(136, 19, 55, 0.6);
+  background-color: rgba(76, 5, 25, 0.4);
+  padding: 12px;
+  font-size: 14px;
+  color: #fecdd3;
+  text-align: center;
+}
+
+.btn-submit {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background-color: #0891b2; // Cyan 600
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+
+  &:hover:not(:disabled) {
+    background-color: #06b6d4; // Cyan 500
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.role-notice {
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+  margin: 8px 0 0 0;
+}

@@ -1,0 +1,26 @@
+@use '@angular/material' as mat;
+
+$dark-theme: mat.define-dark-theme(
+  (
+    color: (
+      primary: mat.$cyan-palette,
+      tertiary: mat.$orange-palette,
+    ),
+    typography: mat.define-typography-config(),
+    density: 0,
+  )
+);
+
+html {
+  height: 100%;
+}
+
+body {
+  color-scheme: dark;
+  margin: 0;
+  height: 100%;
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  @include mat.all-component-themes($dark-theme);
+}

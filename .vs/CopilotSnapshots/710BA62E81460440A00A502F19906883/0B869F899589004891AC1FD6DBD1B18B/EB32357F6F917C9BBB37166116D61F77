@@ -1,0 +1,301 @@
+﻿using BillingService.DTOs;
+using BillingService.Entities;
+using BillingService.Events;
+using BillingService.Repositories;
+using BillingService.Middleware;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace BillingService.Services
+{
+    public class BillingServices : IBillingService
+    {
+        private readonly IBillingRepository _repository;
+        private readonly IProductClient _productClient;
+        private readonly IUserClient _userClient;
+        private readonly IStoreClient _storeClient;
+        private readonly RabbitMqPublisher _publisher;
+
+        public BillingServices(
+            IBillingRepository repository,
+            IProductClient productClient,
+            IUserClient userClient,
+            IStoreClient storeClient,
+            RabbitMqPublisher publisher)
+        {
+            _repository = repository;
+            _productClient = productClient;
+            _userClient = userClient;
+            _storeClient = storeClient;
+            _publisher = publisher;
+        }
+
+        public async Task<object> CreateBillAsync(CreateBillRequest request, Guid userId, Guid storeId)
+        {
+         // ================================
+            // 🔹 1. VALIDATION
+            // ================================
+            if (request == null)
+                throw new BusinessException("Request cannot be null");
+            if (request.Items == null || !request.Items.Any())
+                throw new BusinessException("Bill must contain items");
+
+            // Validate user and store existence
+            if (!await _userClient.UserExistsAsync(userId))
+                throw new NotFoundException($"User with id {userId} not found");
+            if (!await _storeClient.StoreExistsAsync(storeId))
+                throw new NotFoundException($"Store with id {storeId} not found");
+
+            // Validate each item
+            var productIds = new HashSet<Guid>();
+            foreach (var item in request.Items)
+            {
+                if (item == null)
+                    throw new BusinessException("Bill item cannot be null");
+                if (item.Quantity <= 0)
+                    throw new BusinessException("Quantity must be greater than zero");
+                if (!productIds.Add(item.ProductId))
+                    throw new BusinessException($"Duplicate product in bill: {item.ProductId}");
+            }
+
+            // ================================
+            // 🔹 2. INITIALIZE BILL
+            // ================================
+            var bill = new Bill
+            {
+                Id = Guid.NewGuid(),
+                StoreId = storeId,
+                UserId = userId,
+                Items = new List<BillItem>()
+            };
+
+            decimal totalAmount = 0;
+            decimal totalTax = 0;
+
+            // ================================
+            // 🔹 3. PROCESS ITEMS
+            // ================================
+            foreach (var item in request.Items)
+            {
+                // 🔥 CALL PRODUCT SERVICE
+                var product = await _productClient.GetProductById(item.ProductId);
+
+                if (product == null)
+                    throw new NotFoundException($"Product {item.ProductId} not found");
+                if (product.SellingPrice <= 0)
+                    throw new BusinessException($"Product {product.Id} has invalid price");
+                if (product.TaxPercentage < 0)
+                    throw new BusinessException($"Product {product.Id} has invalid tax percentage");
+
+                var itemTotal = product.SellingPrice * item.Quantity;
+                var taxAmount = (itemTotal * product.TaxPercentage) / 100;
+
+                bill.Items.Add(new BillItem
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = product.Id,
+                    ProductName = product.Name,
+                    Quantity = item.Quantity,
+                    UnitPrice = product.SellingPrice,
+                    TaxPercentage = product.TaxPercentage,
+                    TotalPrice = itemTotal + taxAmount
+                });
+
+                totalAmount += itemTotal;
+                totalTax += taxAmount;
+            }
+
+            // ================================
+            // 🔹 4. FINAL CALCULATIONS
+            // ================================
+            bill.TotalAmount = totalAmount;
+            bill.TaxAmount = totalTax;
+            bill.FinalAmount = totalAmount + totalTax;
+
+            // ================================
+            // 🔹 5. SAVE TO DATABASE
+            // ================================
+            await _repository.AddAsync(bill);
+
+            // ================================
+            // 🔥 6. PUBLISH EVENT (VERY IMPORTANT)
+            // ================================
+            var billEvent = new Shared.Contracts.BillCreatedEvent
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = Guid.NewGuid(), // Pass from upstream if available
+                BillId = bill.Id,
+                StoreId = storeId,
+                Items = bill.Items.Select(i => new Shared.Contracts.BillItemEvent
+                {
+                    ProductId = i.ProductId,
+                    Quantity = i.Quantity
+                }).ToList()
+            };
+
+            try
+            {
+                await _publisher.PublishAsync(billEvent, "bill.created.from.billing");
+            }
+            catch (Exception ex)
+            {
+                // Log error (implement logging as needed)
+                // Optionally: throw new BusinessException("Failed to publish bill-created event", ex);
+            }
+
+            // ================================
+            // 🔹 7. RETURN RESPONSE
+            // ================================
+            return new
+            {
+                BillId = bill.Id,
+                bill.TotalAmount,
+                bill.TaxAmount,
+                bill.FinalAmount
+            };
+        }
+
+        public async Task<object> GetByIdAsync(Guid id)
+        {
+            var bill = await _repository.GetByIdAsync(id);
+            if (bill == null)
+                throw new NotFoundException($"Bill with id {id} not found");
+            return bill;
+        }
+
+        public async Task<IEnumerable<object>> GetAllAsync()
+        {
+            var bills = await _repository.GetAllAsync();
+            return bills.Cast<object>();
+        }
+
+        public async Task<IEnumerable<object>> GetByStatusAsync(string status)
+        {
+            var bills = await _repository.GetByStatusAsync(status);
+            return bills.Cast<object>();
+        }
+
+        public async Task<IEnumerable<object>> GetByUserAsync(Guid userId)
+        {
+            var bills = await _repository.GetByUserAsync(userId);
+            return bills.Cast<object>();
+        }
+
+        public async Task<IEnumerable<object>> GetByDateRangeAsync(DateTime start, DateTime end)
+        {
+            var bills = await _repository.GetByDateRangeAsync(start, end);
+            return bills.Cast<object>();
+        }
+
+        public async Task<IEnumerable<object>> GetTodayAsync()
+        {
+            var bills = await _repository.GetTodayAsync();
+            return bills.Cast<object>();
+        }
+
+        public async Task<decimal> GetTotalRevenueAsync()
+        {
+            return await _repository.GetTotalRevenueAsync();
+        }
+
+        public async Task CancelAsync(Guid id)
+        {
+            var bill = await _repository.GetByIdAsync(id);
+            if (bill == null)
+                throw new NotFoundException($"Bill with id {id} not found");
+            bill.Status = "Cancelled";
+            await _repository.UpdateAsync(bill);
+        }
+
+        public async Task RetryAsync(Guid id)
+        {
+            var bill = await _repository.GetByIdAsync(id);
+            if (bill == null)
+                throw new NotFoundException($"Bill with id {id} not found");
+            if (bill.Status != "Failed")
+                throw new BusinessException("Only failed bills can be retried");
+            bill.Status = "Pending";
+            await _repository.UpdateAsync(bill);
+        }
+
+        public async Task<IEnumerable<object>> GetByStoreAsync(Guid storeId)
+        {
+            var bills = await _repository.GetByStoreAsync(storeId);
+            return bills.Cast<object>();
+        }
+
+        public async Task<IEnumerable<object>> GetByUserDateRangeAsync(Guid userId, DateTime start, DateTime end)
+        {
+            var bills = await _repository.GetByUserDateRangeAsync(userId, start, end);
+            return bills.Cast<object>();
+        }
+
+        public async Task<IEnumerable<object>> GetByStoreDateRangeAsync(Guid storeId, DateTime start, DateTime end)
+        {
+            var bills = await _repository.GetByStoreDateRangeAsync(storeId, start, end);
+            return bills.Cast<object>();
+        }
+
+        public async Task<object> GetByNumberAsync(string billNumber)
+        {
+            var bill = await _repository.GetByNumberAsync(billNumber);
+            if (bill == null)
+                throw new NotFoundException($"Bill with number {billNumber} not found");
+            return bill;
+        }
+
+        public async Task<IEnumerable<object>> SearchAsync(string numberOrReference)
+        {
+            var bills = await _repository.SearchAsync(numberOrReference);
+            return bills.Cast<object>();
+        }
+
+        public async Task<decimal> GetStoreRevenueAsync(Guid storeId)
+        {
+            return await _repository.GetStoreRevenueAsync(storeId);
+        }
+
+        public async Task<IEnumerable<object>> GetTopCustomersAsync(Guid storeId, int count)
+        {
+            return await _repository.GetTopCustomersAsync(storeId, count);
+        }
+
+        public async Task<IEnumerable<object>> GetTopProductsAsync(Guid storeId, int count)
+        {
+            return await _repository.GetTopProductsAsync(storeId, count);
+        }
+
+        public async Task RefundAsync(Guid billId)
+        {
+            await _repository.RefundAsync(billId);
+        }
+
+        public async Task MarkPaidAsync(Guid billId)
+        {
+            await _repository.MarkPaidAsync(billId);
+        }
+
+        public async Task AddNoteAsync(Guid billId, string note)
+        {
+            await _repository.AddNoteAsync(billId, note);
+        }
+
+        public async Task<IEnumerable<object>> GetHistoryAsync(Guid billId)
+        {
+            return await _repository.GetHistoryAsync(billId);
+        }
+
+        public async Task<(IEnumerable<object>, int)> GetPagedAsync(int page, int pageSize, string? status, Guid? userId, Guid? storeId, DateTime? start, DateTime? end, string? sortBy)
+        {
+            var (bills, total) = await _repository.GetPagedAsync(page, pageSize, status, userId, storeId, start, end, sortBy);
+            return (bills.Cast<object>(), total);
+        }
+
+        public async Task<string> ExportCsvAsync()
+        {
+            return await _repository.ExportCsvAsync();
+        }
+    }
+}

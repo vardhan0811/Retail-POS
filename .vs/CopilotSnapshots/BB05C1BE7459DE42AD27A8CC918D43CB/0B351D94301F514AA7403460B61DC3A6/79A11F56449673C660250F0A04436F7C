@@ -1,0 +1,40 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ProductService.Data;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductService.Controllers
+{
+    [ApiController]
+    [Route("api/products/lookup")]
+    [Authorize]
+    public class ProductLookupController : ControllerBase
+    {
+        private readonly ProductDbContext _db;
+        public ProductLookupController(ProductDbContext db)
+        {
+            _db = db;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Lookup([FromQuery] Guid storeId, [FromQuery] string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return BadRequest("Query is required");
+
+            var q = query.Trim().ToLower();
+            var products = await _db.Products
+                .Where(p => p.StoreId == storeId && p.IsActive &&
+                    (p.Name.ToLower().Contains(q) ||
+                     p.SKU.ToLower().Contains(q) ||
+                     p.Barcode.ToLower().Contains(q)))
+                .OrderBy(p => p.Name)
+                .Take(20)
+                .ToListAsync();
+            return Ok(products);
+        }
+    }
+}

@@ -31,9 +31,74 @@ namespace AdminService.DTOs
 
     public class DashboardResponseDto
     {
-        public object Users { get; set; } = new();
-        public object Stores { get; set; } = new();
-        public object Billing { get; set; } = new();
-        public object? Product { get; set; }
+        public SummaryBox Users { get; set; } = new();
+        public SummaryBox Stores { get; set; } = new();
+        public DashboardSummaryDto BillingSummary { get; set; } = new();
+        public DashboardAlertsDto Alerts { get; set; } = new();
+        public List<DashboardActivityDto> RecentActivity { get; set; } = new();
+        public InventoryInsightDto InventoryInsights { get; set; } = new();
+    }
+
+    public class SummaryBox
+    {
+        public int Total { get; set; }
+        public int Active { get; set; }
+        public int Inactive { get; set; }
+        public DateTime? LastUpdate { get; set; }
+    }
+
+    public class DashboardSummaryDto
+    {
+        public decimal TodayRevenue { get; set; }
+        public decimal YesterdayRevenue { get; set; }
+        public decimal RevenueChangePercentage { get; set; }
+        public int TodayTransactions { get; set; }
+        public decimal TodayAvgBillValue { get; set; }
+        public decimal TodayRefundAmount { get; set; }
+        public int TodayCancelledOrders { get; set; }
+        public int ActiveStaffCount { get; set; }
+        public decimal TotalGrossRevenue { get; set; }
+        public List<DailySalesTrendDto> SalesTrend { get; set; } = new();
+    }
+
+    public class DailySalesTrendDto
+    {
+        public DateTime Date { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    public class DashboardAlertsDto
+    {
+        public int PendingRefunds { get; set; }
+        public int LowStockItems { get; set; }
+        public int OutOfStockItems { get; set; }
+        public int FailedTransactions { get; set; }
+    }
+
+    public class DashboardActivityDto
+    {
+        public string Type { get; set; } = string.Empty; 
+        public string Message { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public class InventoryInsightDto
+    {
+        public List<ProductViewDto> TopSelling { get; set; } = new();
+        public List<ProductViewDto> LowStockItems { get; set; } = new();
+    }
+
+    public class RefundRecordDto
+    {
+        public Guid Id { get; set; }
+        public Guid BillId { get; set; }
+        public string BillNumber { get; set; } = string.Empty;
+        public string ProductName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public decimal RefundAmount { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
     }
 }

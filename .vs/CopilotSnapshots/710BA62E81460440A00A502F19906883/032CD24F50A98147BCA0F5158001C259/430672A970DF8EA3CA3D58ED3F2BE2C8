@@ -1,0 +1,17 @@
+﻿{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft.AspNetCore": "Warning"
+        }
+    },
+    "AllowedHosts": "*",
+    "ConnectionStrings": {
+        "DefaultConnection": "Server=.\\SQLEXPRESS;Database=RetailPOS_Auth;Trusted_Connection=True;TrustServerCertificate=True;"
+    },
+    "Jwt": {
+        "Key": "THIS_IS_SUPER_SECRET_KEY_1234567890",
+        "Issuer": "AuthService",
+        "Audience": "Microservices"
+    }
+}

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AdminService.DTOs;
+using Shared.Contracts.Models;
 
 namespace AdminService.Controllers
 {
@@ -18,9 +19,9 @@ namespace AdminService.Controllers
 
         [Authorize(Policy = "VIEW_ADMIN_READ")]
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] Guid? storeId = null, [FromQuery] string? role = null, [FromQuery] bool? isActive = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetAll([FromQuery] Guid? storeId = null, [FromQuery] string? role = null, [FromQuery] UserStatus? status = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            var result = await _service.GetPagedAsync(storeId, role, isActive, page, pageSize);
+            var result = await _service.GetPagedAsync(storeId, role, status, page, pageSize);
 
             return Ok(new ApiResponse<PagedResult<UserDto>>
             {
@@ -34,24 +35,16 @@ namespace AdminService.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
-            var user = await _service.GetByIdAsync(id);
-            if (user == null)
+            var pagedResult = await _service.GetPagedAsync(null, null, null, 1, 100);
+            var dto = pagedResult.Items.FirstOrDefault(i => i.Id == id);
+            
+            if (dto == null)
                 return NotFound(new ApiResponse<UserDto>
                 {
                     Success = false,
                     Message = "User not found",
                     Data = null
                 });
-
-            var dto = new UserDto
-            {
-                Id = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
-                Role = user.Role,
-                IsActive = user.IsActive,
-                StoreId = user.StoreId
-            };
 
             return Ok(new ApiResponse<UserDto>
             {
@@ -94,5 +87,52 @@ namespace AdminService.Controllers
                 Data = dto
             });
         }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpPut("{id}/stores")]
+        public async Task<IActionResult> AssignStores(Guid id, [FromBody] UpdateUserStoreRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid request", Data = ModelState });
+
+            var dto = await _service.AssignStoreAsync(id, request);
+
+            return Ok(new ApiResponse<UserDto>
+            {
+                Success = true,
+                Message = "User store updated successfully",
+                Data = dto
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpPost("{id}/approve")]
+        public async Task<IActionResult> Approve(Guid id)
+        {
+            var dto = await _service.ApproveUserAsync(id);
+            return Ok(new ApiResponse<UserDto>
+            {
+                Success = true,
+                Message = "User approved successfully",
+                Data = dto
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpPost("{id}/reject")]
+        public async Task<IActionResult> Reject(Guid id, [FromBody] RejectUserAdminRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid request", Data = ModelState });
+
+            var dto = await _service.RejectUserAsync(id, request.Reason);
+            return Ok(new ApiResponse<UserDto>
+            {
+                Success = true,
+                Message = "User rejected successfully",
+                Data = dto
+            });
+        }
+
     }
 }

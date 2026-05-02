@@ -1,0 +1,109 @@
+﻿using BillingService.Data;
+using BillingService.Repositories;
+using BillingService.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 🔥 DB
+builder.Services.AddDbContext<BillingDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// 🔥 JWT AUTH (MUST MATCH AUTHSERVICE)
+var jwtKey = builder.Configuration["Jwt:Key"];
+
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+// 🔥 AUTHORIZATION POLICIES (THIS WAS MISSING)
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CREATE_BILL",
+        policy => policy.RequireClaim("permission", "CREATE_BILL"));
+
+    options.AddPolicy("VIEW_BILL",
+        policy => policy.RequireClaim("permission", "VIEW_BILL"));
+});
+
+// 🔥 DEPENDENCIES
+builder.Services.AddScoped<IBillingRepository, BillingRepository>();
+builder.Services.AddScoped<IBillingService, BillingServices>();
+builder.Services.AddSingleton<RabbitMqPublisher>(); // Singleton since it manages its own connections
+builder.Services.AddScoped<RabbitMqConsumer>(); // Scoped since it uses DbContext
+
+builder.Services.AddHttpContextAccessor(); 
+builder.Services.AddHttpClient<IProductClient, ProductClient>(client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5002/");
+});
+
+// 🔥 CONTROLLERS + SWAGGER
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter 'Bearer <token>'"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var consumer = scope.ServiceProvider.GetRequiredService<RabbitMqConsumer>();
+    consumer.Start();
+}
+
+// 🔥 PIPELINE
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
+app.UseAuthentication();  // MUST COME BEFORE AUTHORIZATION
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();

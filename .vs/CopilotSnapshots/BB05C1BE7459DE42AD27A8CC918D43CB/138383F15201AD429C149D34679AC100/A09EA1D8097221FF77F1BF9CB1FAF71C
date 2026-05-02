@@ -1,0 +1,372 @@
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.EntityFrameworkCore;
+using ProductService.DTOs;
+using ProductService.Entities;
+using ProductService.Repositories;
+
+namespace ProductService.Services
+{
+    public class ProductService : IProductService
+    {
+        private readonly IProductRepository _repository;
+        private readonly IMemoryCache _cache;
+
+        private readonly MemoryCacheEntryOptions _cacheOptions =
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+            };
+
+        public ProductService(IProductRepository repository, IMemoryCache cache)
+        {
+            _repository = repository;
+            _cache = cache;
+        }
+
+        // ---------------- CREATE ----------------
+        public async Task<Product> CreateProductAsync(CreateProductRequest request)
+        {
+            ValidateCreate(request);
+
+            if (await _repository.ExistsBySKUAsync(request.SKU, request.StoreId))
+                throw new Middleware.BusinessException("SKU already exists");
+
+            if (!string.IsNullOrWhiteSpace(request.Barcode) &&
+                await _repository.ExistsByBarcodeAsync(request.Barcode, request.StoreId))
+                throw new Middleware.BusinessException("Barcode already exists");
+
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = request.Name.Trim(),
+                SKU = request.SKU.Trim(),
+                Barcode = request.Barcode ?? string.Empty,
+                CategoryId = request.CategoryId,
+                TaxId = request.TaxId,
+                MRP = request.MRP,
+                SellingPrice = request.SellingPrice,
+                StoreId = request.StoreId,
+                IsActive = true,
+                Stock = 0
+            };
+
+            await _repository.AddAsync(product);
+            return product;
+        }
+
+        private void ValidateCreate(CreateProductRequest request)
+        {
+            if (request == null)
+                throw new Middleware.BusinessException("Request cannot be null");
+
+            if (string.IsNullOrWhiteSpace(request.Name))
+                throw new Middleware.BusinessException("Product name is required");
+
+            if (string.IsNullOrWhiteSpace(request.SKU))
+                throw new Middleware.BusinessException("SKU is required");
+
+            if (request.CategoryId == Guid.Empty)
+                throw new Middleware.BusinessException("CategoryId is required");
+
+            if (request.TaxId == Guid.Empty)
+                throw new Middleware.BusinessException("TaxId is required");
+
+            if (request.StoreId == Guid.Empty)
+                throw new Middleware.BusinessException("StoreId is required");
+
+            if (request.MRP <= 0 || request.SellingPrice <= 0)
+                throw new Middleware.BusinessException("Prices must be positive");
+
+            if (request.SellingPrice > request.MRP)
+                throw new Middleware.BusinessException("SellingPrice cannot exceed MRP");
+        }
+
+        // ---------------- GET ----------------
+        public async Task<Product> GetByIdAsync(Guid id)
+        {
+            var cacheKey = $"product_{id}";
+
+            if (!_cache.TryGetValue(cacheKey, out Product? product))
+            {
+                product = await _repository.GetByIdAsync(id);
+
+                if (product != null)
+                    _cache.Set(cacheKey, product, _cacheOptions);
+            }
+
+            if (product == null)
+                throw new Middleware.NotFoundException($"Product with id {id} not found");
+
+            return product;
+        }
+
+        // ---------------- SEARCH ----------------
+        public async Task<IEnumerable<Product>> SearchAsync(string query, Guid storeId)
+        {
+            return await _repository.SearchAsync(query, storeId);
+        }
+
+        // ---------------- UPDATE ----------------
+        public async Task UpdateAsync(Guid id, UpdateProductRequest request)
+        {
+            if (request == null)
+                throw new Middleware.BusinessException("Invalid request");
+
+            var product = await _repository.GetByIdAsync(id);
+            if (product == null)
+                throw new Middleware.NotFoundException("Product not found");
+
+            // Validation
+            if (string.IsNullOrWhiteSpace(request.Name))
+                throw new Middleware.BusinessException("Product name is required");
+            if (string.IsNullOrWhiteSpace(request.SKU))
+                throw new Middleware.BusinessException("SKU is required");
+            if (request.CategoryId == Guid.Empty)
+                throw new Middleware.BusinessException("CategoryId is required");
+            if (request.TaxId == Guid.Empty)
+                throw new Middleware.BusinessException("TaxId is required");
+            if (request.MRP <= 0 || request.SellingPrice <= 0)
+                throw new Middleware.BusinessException("Prices must be positive");
+            if (request.SellingPrice > request.MRP)
+                throw new Middleware.BusinessException("SellingPrice cannot exceed MRP");
+
+            // SKU uniqueness (excluding self)
+            if (await _repository.ExistsBySKUAsync(request.SKU, product.StoreId, id))
+                throw new Middleware.BusinessException("SKU already exists");
+
+            // Barcode uniqueness (excluding self)
+            if (!string.IsNullOrWhiteSpace(request.Barcode) &&
+                await _repository.ExistsByBarcodeAsync(request.Barcode, product.StoreId, id))
+                throw new Middleware.BusinessException("Barcode already exists");
+
+            product.Name = request.Name.Trim();
+            product.SKU = request.SKU.Trim();
+            product.Barcode = request.Barcode ?? string.Empty;
+            product.CategoryId = request.CategoryId;
+            product.TaxId = request.TaxId;
+            product.MRP = request.MRP;
+            product.SellingPrice = request.SellingPrice;
+            product.IsActive = request.IsActive;
+
+            try
+            {
+                await _repository.UpdateAsync(product);
+                _cache.Remove($"product_{id}");
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new Middleware.BusinessException("Product was modified by another request. Please retry.");
+            }
+        }
+
+        // ---------------- DELETE ----------------
+        public async Task DeleteAsync(Guid id)
+        {
+            var product = await _repository.GetByIdAsync(id)
+                ?? throw new Middleware.NotFoundException("Product not found");
+
+            if (!product.IsActive)
+                throw new Middleware.BusinessException("Product already deleted");
+
+            product.IsActive = false;
+
+            try
+            {
+                await _repository.UpdateAsync(product);
+                _cache.Remove($"product_{id}");
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new Middleware.BusinessException("Product was modified by another request. Please retry.");
+            }
+        }
+
+        // ---------------- PAGINATION ----------------
+        public async Task<object> GetPagedAsync(
+            Guid storeId,
+            int page,
+            int pageSize,
+            string? search = null,
+            decimal? minPrice = null,
+            decimal? maxPrice = null,
+            string? sortBy = null)
+        {
+            return await _repository.GetPagedAsync(storeId, page, pageSize, search, minPrice, maxPrice, sortBy);
+        }
+
+        // ---------------- STOCK ----------------
+        public async Task IncreaseStockAsync(Guid productId, int quantity)
+        {
+            if (quantity <= 0)
+                throw new Middleware.BusinessException("Quantity must be positive");
+
+            var product = await _repository.GetByIdAsync(productId)
+                ?? throw new Middleware.NotFoundException("Product not found");
+
+            product.Stock += quantity;
+
+            try
+            {
+                await _repository.UpdateAsync(product);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new Middleware.BusinessException("Product was modified by another request. Please retry.");
+            }
+        }
+
+        public async Task DecreaseStockAsync(Guid productId, int quantity)
+        {
+            if (quantity <= 0)
+                throw new Middleware.BusinessException("Quantity must be positive");
+
+            var product = await _repository.GetByIdAsync(productId)
+                ?? throw new Middleware.NotFoundException("Product not found");
+
+            if (product.Stock < quantity)
+                throw new Middleware.BusinessException("Insufficient stock");
+
+            product.Stock -= quantity;
+            if (product.Stock < 0)
+                throw new Middleware.BusinessException("Stock cannot be negative");
+
+            try
+            {
+                await _repository.UpdateAsync(product);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new Middleware.BusinessException("Product was modified by another request. Please retry.");
+            }
+        }
+
+        public async Task BulkUpdateStockAsync(IEnumerable<StockUpdateItem> updates)
+        {
+            if (updates == null || !updates.Any())
+                throw new Middleware.BusinessException("At least one stock update item is required");
+
+            foreach (var update in updates)
+            {
+                if (update.ProductId == Guid.Empty)
+                    throw new Middleware.BusinessException("ProductId is required");
+
+                if (update.Quantity == 0)
+                    continue;
+            }
+
+            try
+            {
+                await _repository.BulkUpdateStockAsync(updates);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new Middleware.BusinessException("One or more products were modified by another request. Please retry.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new Middleware.BusinessException(ex.Message);
+            }
+        }
+
+        public async Task<StockSummaryDto> GetStockSummaryAsync(Guid storeId)
+        {
+            if (storeId == Guid.Empty)
+                throw new Middleware.BusinessException("StoreId is required");
+
+            return await _repository.GetStockSummaryAsync(storeId);
+        }
+
+        // ---------------- CATEGORY ----------------
+        public async Task<IEnumerable<Category>> GetAllCategoriesAsync(Guid storeId)
+        {
+            if (storeId == Guid.Empty)
+                throw new Middleware.BusinessException("StoreId is required");
+
+            return await _repository.GetAllCategoriesAsync(storeId);
+        }
+
+        public async Task<Category?> GetCategoryByIdAsync(Guid id)
+        {
+            if (id == Guid.Empty)
+                throw new Middleware.BusinessException("CategoryId is required");
+
+            return await _repository.GetCategoryByIdAsync(id);
+        }
+
+        public async Task<Category> CreateCategoryAsync(CreateCategoryRequest request)
+        {
+            if (request == null)
+                throw new Middleware.BusinessException("Category data is required");
+            if (string.IsNullOrWhiteSpace(request.Name))
+                throw new Middleware.BusinessException("Category name is required");
+            if (request.StoreId == Guid.Empty)
+                throw new Middleware.BusinessException("StoreId is required");
+
+            var category = new Category
+            {
+                Name = request.Name.Trim(),
+                StoreId = request.StoreId,
+                IsActive = true
+            };
+            return await _repository.CreateCategoryAsync(category);
+        }
+
+        public async Task<Category?> UpdateCategoryAsync(Guid id, Category update)
+        {
+            if (id == Guid.Empty)
+                throw new Middleware.BusinessException("CategoryId is required");
+            if (update == null)
+                throw new Middleware.BusinessException("Category data is required");
+            if (string.IsNullOrWhiteSpace(update.Name))
+                throw new Middleware.BusinessException("Category name is required");
+            return await _repository.UpdateCategoryAsync(id, update);
+        }
+
+        public async Task<bool> DeleteCategoryAsync(Guid id)
+        {
+            if (id == Guid.Empty)
+                throw new Middleware.BusinessException("CategoryId is required");
+
+            var category = await _repository.GetCategoryByIdAsync(id);
+            if (category == null || !category.IsActive)
+                throw new Middleware.NotFoundException("Category not found");
+
+            var hasActiveProducts = await _repository.HasActiveProductsInCategoryAsync(id);
+            if (hasActiveProducts)
+                throw new Middleware.BusinessException("Cannot delete category with active products");
+
+            return await _repository.DeleteCategoryAsync(id);
+        }
+
+        // ---------------- LOOKUP ----------------
+        public async Task<IEnumerable<Product>> LookupAsync(Guid storeId, string query)
+        {
+            if (storeId == Guid.Empty)
+                throw new Middleware.BusinessException("StoreId is required");
+            if (string.IsNullOrWhiteSpace(query))
+                throw new Middleware.BusinessException("Query is required");
+            return await _repository.LookupAsync(storeId, query);
+        }
+
+        // ---------------- FILTERS ----------------
+        public async Task<IEnumerable<Product>> GetByCategoryAsync(Guid categoryId, Guid storeId)
+        {
+            return await _repository.GetByCategoryAsync(categoryId, storeId);
+        }
+
+        public async Task<IEnumerable<Product>> GetLowStockAsync(Guid storeId, int threshold)
+        {
+            return await _repository.GetLowStockAsync(storeId, threshold);
+        }
+
+        public async Task<IEnumerable<Product>> GetOutOfStockAsync(Guid storeId)
+        {
+            return await _repository.GetOutOfStockAsync(storeId);
+        }
+
+        public async Task<IEnumerable<Product>> GetTopSellingAsync(Guid storeId, int count)
+        {
+            return await _repository.GetTopSellingAsync(storeId, count);
+        }
+    }
+}

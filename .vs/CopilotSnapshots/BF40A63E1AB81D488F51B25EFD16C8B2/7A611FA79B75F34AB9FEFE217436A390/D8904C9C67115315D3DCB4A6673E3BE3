@@ -1,0 +1,37 @@
+﻿using BillingService.DTOs;
+using BillingService.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+
+namespace BillingService.Controllers
+{
+    [ApiController]
+    [Route("api/bills")]
+    public class BillingController : ControllerBase
+    {
+        private readonly IBillingService _service;
+
+        public BillingController(IBillingService service)
+        {
+            _service = service;
+        }
+
+        [Authorize(Policy = "CREATE_BILL")]
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateBillRequest request)
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            var storeId = Guid.Parse(User.FindFirst("storeId").Value);
+
+            var result = await _service.CreateBillAsync(request, userId, storeId);
+
+            return Ok(new
+            {
+                Success = true,
+                Message = "Bill created successfully",
+                Data = result
+            });
+        }
+    }
+}

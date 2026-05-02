@@ -1,0 +1,196 @@
+﻿using AdminService.Data;
+using AdminService.HealthChecks;
+using AdminService.Middleware;
+using AdminService.Repositories;
+using AdminService.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using Serilog;
+using Shared.Messaging.RabbitMq;
+using System.Text;
+
+namespace AdminService
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
+            var logPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Logs", "log-.txt");
+            Log.Logger = new LoggerConfiguration()
+                .Enrich.FromLogContext()
+                .WriteTo.Console()
+                .WriteTo.File(
+                    path: logPath,
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 14,
+                    shared: true,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {UserEmail} {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+            builder.Host.UseSerilog();
+
+            builder.Services.AddDbContext<AdminDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            var jwtKey = builder.Configuration["Jwt:Key"]
+                ?? throw new InvalidOperationException("Missing config: Jwt:Key");
+            var issuer = builder.Configuration["Jwt:Issuer"];
+            var audiences = builder.Configuration.GetSection("Jwt:Audiences").Get<string[]>()
+                ?? (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Audience"])
+                    ? Array.Empty<string>()
+                    : new[] { builder.Configuration["Jwt:Audience"]! });
+
+            if (audiences.Length == 0)
+                throw new InvalidOperationException("Missing config: Jwt:Audiences (or Jwt:Audience)");
+
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = issuer,
+                        ValidateAudience = true,
+                        ValidAudiences = audiences,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+                    };
+                });
+
+            builder.Services.AddAuthorization(options =>
+            {
+                options.AddPolicy("VIEW_ADMIN_DASHBOARD", policy => policy.RequireRole("Admin", "Cashier"));
+                options.AddPolicy("MANAGE_USERS", policy => policy.RequireRole("Admin"));
+                options.AddPolicy("VIEW_REPORTS", policy => policy.RequireRole("Admin", "Cashier"));
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
+
+            builder.Services.AddHealthChecks()
+                .AddCheck<SqlConnectionHealthCheck>("sql")
+                .AddCheck<RabbitMqHealthCheck>("rabbitmq");
+
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<IStoreRepository, StoreRepository>();
+            builder.Services.AddScoped<IUserService, UserService>();
+            builder.Services.AddScoped<IStoreService, StoreService>();
+            builder.Services.AddHttpClient();
+
+            builder.Services.AddSingleton<RabbitMqPublisherBase>();
+            builder.Services.AddHostedService<UserCreatedConsumerHostedService>();
+            builder.Services.AddHostedService<StoreCreatedConsumerHostedService>();
+
+            builder.Services.AddControllers();
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Enter 'Bearer <token>'"
+                });
+
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
+
+            var app = builder.Build();
+
+            app.UseMiddleware<ExceptionMiddleware>();
+            app.UseHttpsRedirection();
+
+            // Dependency gate (Development): if dependencies are unhealthy, block all endpoints (except /health)
+            app.Use(async (context, next) =>
+            {
+                if (!app.Environment.IsDevelopment())
+                {
+                    await next();
+                    return;
+                }
+
+                if (context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase))
+                {
+                    await next();
+                    return;
+                }
+
+                var health = await context.RequestServices.GetRequiredService<HealthCheckService>()
+                    .CheckHealthAsync(context.RequestAborted);
+
+                if (health.Status == HealthStatus.Healthy)
+                {
+                    await next();
+                    return;
+                }
+
+                var accept = context.Request.Headers.Accept.ToString();
+                var wantsHtml = accept.Contains("text/html", StringComparison.OrdinalIgnoreCase)
+                                || context.Request.Path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase);
+
+                if (wantsHtml)
+                {
+                    context.Response.Redirect("/health");
+                    return;
+                }
+
+                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    success = false,
+                    message = "Service dependencies are unhealthy. Check /health.",
+                    status = health.Status.ToString()
+                }));
+            });
+
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
+
+            app.UseAuthentication();
+            app.UseMiddleware<SerilogUserContextMiddleware>();
+            app.UseAuthorization();
+            app.UseSerilogRequestLogging();
+
+            app.MapGet("/", async (HttpContext ctx) =>
+            {
+                var health = await ctx.RequestServices.GetRequiredService<HealthCheckService>()
+                    .CheckHealthAsync(ctx.RequestAborted);
+                return health.Status == HealthStatus.Healthy
+                    ? Results.Redirect("/swagger")
+                    : Results.Redirect("/health");
+            }).AllowAnonymous();
+
+            app.MapControllers();
+            app.MapHealthChecks("/health", new HealthCheckOptions
+            {
+                ResponseWriter = AdminService.HealthChecks.HealthCheckResponseWriter.WriteAsync
+            }).AllowAnonymous();
+
+            app.Run();
+        }
+    }
+}

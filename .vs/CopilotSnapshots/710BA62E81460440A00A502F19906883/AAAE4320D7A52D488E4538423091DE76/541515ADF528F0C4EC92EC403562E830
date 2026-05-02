@@ -1,0 +1,19 @@
+﻿namespace BillingService.Entities
+{
+    public class Bill
+    {
+        public Guid Id { get; set; }
+
+        public Guid StoreId { get; set; }
+        public Guid UserId { get; set; }
+
+        public decimal TotalAmount { get; set; }   // before tax
+        public decimal TaxAmount { get; set; }
+        public decimal FinalAmount { get; set; }   // after tax
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public List<BillItem> Items { get; set; }
+        public String Status { get; set; } = "Pending"; 
+    }
+}

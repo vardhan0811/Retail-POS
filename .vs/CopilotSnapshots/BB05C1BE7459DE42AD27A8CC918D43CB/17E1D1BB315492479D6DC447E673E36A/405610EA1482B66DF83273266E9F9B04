@@ -1,0 +1,339 @@
+﻿using BillingService.DTOs;
+using BillingService.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+
+namespace BillingService.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class BillingController : ControllerBase
+    {
+        private readonly IBillingService _service;
+
+        public BillingController(IBillingService service)
+        {
+            _service = service;
+        }
+
+        [Authorize(Policy = "CREATE_BILL")]
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateBillRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid request", Data = ModelState });
+
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? throw new UnauthorizedAccessException("Missing NameIdentifier claim.");
+            var storeIdStr = User.FindFirst("storeId")?.Value
+                ?? throw new UnauthorizedAccessException("Missing storeId claim.");
+            var userId = Guid.Parse(userIdStr);
+            var storeId = Guid.Parse(storeIdStr);
+            request.UserId = userId;
+            request.StoreId = storeId;
+            var result = await _service.CreateBillAsync(request);
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Bill created successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "CREATE_BILL")]
+        [HttpPost("{id}:hold")]
+        public async Task<IActionResult> Hold(Guid id)
+        {
+            await _service.HoldAsync(id);
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Bill put on hold successfully",
+                Data = null
+            });
+        }
+
+        [Authorize(Policy = "CREATE_BILL")]
+        [HttpPost("{id}:resume")]
+        public async Task<IActionResult> Resume(Guid id)
+        {
+            await _service.ResumeAsync(id);
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Bill resumed successfully",
+                Data = null
+            });
+        }
+
+        [Authorize(Policy = "MARK_PAID_BILL")]
+        [HttpPost("{id}:finalize")]
+        public async Task<IActionResult> Finalize(Guid id, [FromBody] FinalizeBillRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid request", Data = ModelState });
+
+            await _service.FinalizeAsync(id, request.PaymentId);
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Bill finalized successfully",
+                Data = null
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var result = await _service.GetAllAsync();
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Bills fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var result = await _service.GetByIdAsync(id);
+            if (result == null)
+                return NotFound(new ApiResponse<object> { Success = false, Message = "Bill not found", Data = null });
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Bill fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("status/{status}")]
+        public async Task<IActionResult> GetByStatus(string status)
+        {
+            var result = await _service.GetByStatusAsync(status);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = $"Bills with status '{status}' fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("user/{userId}")]
+        public async Task<IActionResult> GetByUser(Guid userId)
+        {
+            var result = await _service.GetByUserAsync(userId);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Bills for user fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("today")]
+        public async Task<IActionResult> GetToday()
+        {
+            var result = await _service.GetTodayAsync();
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Today's bills fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("date-range")]
+        public async Task<IActionResult> GetByDateRange([FromQuery] string start, [FromQuery] string end)
+        {
+            if (!DateOnly.TryParse(start, out var startDate) || !DateOnly.TryParse(end, out var endDate))
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Use yyyy-MM-dd for start and end.", Data = null });
+
+            var startDt = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endDt = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+            var result = await _service.GetByDateRangeAsync(startDt, endDt);
+            return Ok(new ApiResponse<IEnumerable<object>> { Success = true, Message = "Bills in date range fetched successfully", Data = result });
+        }
+
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("total-revenue")]
+        public async Task<IActionResult> GetTotalRevenue()
+        {
+            var result = await _service.GetTotalRevenueAsync();
+            return Ok(new ApiResponse<decimal>
+            {
+                Success = true,
+                Message = "Total revenue fetched successfully",
+                Data = result
+            });
+        }
+
+     
+
+
+        // Advanced endpoints
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("store/{storeId}")]
+        public async Task<IActionResult> GetByStore(Guid storeId)
+        {
+            var result = await _service.GetByStoreAsync(storeId);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Bills for store fetched successfully",
+                Data = result
+            });
+        }
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("user/{userId}/date-range")]
+        public async Task<IActionResult> GetByUserDateRange(Guid userId, [FromQuery] string start, [FromQuery] string end)
+        {
+            if (!DateOnly.TryParse(start, out var startDate) || !DateOnly.TryParse(end, out var endDate))
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Use yyyy-MM-dd for start and end.",
+                    Data = null
+                });
+
+            var startDt = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endDt = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+            var result = await _service.GetByUserDateRangeAsync(userId, startDt, endDt);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Bills for user in date range fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("store/{storeId}/date-range")]
+        public async Task<IActionResult> GetByStoreDateRange(Guid storeId, [FromQuery] string start, [FromQuery] string end)
+        {
+            if (!DateOnly.TryParse(start, out var startDate) || !DateOnly.TryParse(end, out var endDate))
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Use yyyy-MM-dd for start and end.",
+                    Data = null
+                });
+
+            var startDt = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endDt = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+            var result = await _service.GetByStoreDateRangeAsync(storeId, startDt, endDt);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Bills for store in date range fetched successfully",
+                Data = result
+            });
+        }
+
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("search")]
+        public async Task<IActionResult> Search([FromQuery] string q)
+        {
+            var result = await _service.SearchAsync(q);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Bills search completed",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("store/{storeId}/revenue")]
+        public async Task<IActionResult> GetStoreRevenue(Guid storeId)
+        {
+            var result = await _service.GetStoreRevenueAsync(storeId);
+            return Ok(new ApiResponse<decimal>
+            {
+                Success = true,
+                Message = "Store revenue fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("store/{storeId}/top-customers")]
+        public async Task<IActionResult> GetTopCustomers(Guid storeId, [FromQuery] int count = 10)
+        {
+            var result = await _service.GetTopCustomersAsync(storeId, count);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Top customers fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("store/{storeId}/top-products")]
+        public async Task<IActionResult> GetTopProducts(Guid storeId, [FromQuery] int count = 10)
+        {
+            var result = await _service.GetTopProductsAsync(storeId, count);
+            return Ok(new ApiResponse<IEnumerable<object>>
+            {
+                Success = true,
+                Message = "Top products fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "REFUND_BILL")]
+        [HttpPost("{id}/refund")]
+        public async Task<IActionResult> Refund(Guid id)
+        {
+            await _service.RefundAsync(id);
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Bill refunded successfully",
+                Data = null
+            });
+        }
+
+        
+
+        
+
+        [Authorize(Policy = "VIEW_BILL")]
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? status = null, [FromQuery] Guid? userId = null, [FromQuery] Guid? storeId = null, [FromQuery] DateTime? start = null, [FromQuery] DateTime? end = null, [FromQuery] string? sortBy = null)
+        {
+            var (bills, total) = await _service.GetPagedAsync(page, pageSize, status, userId, storeId, start, end, sortBy);
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Paged bills fetched successfully",
+                Data = new { bills, total }
+            });
+        }
+
+        [Authorize(Policy = "EXPORT_BILL")]
+        [HttpGet("export/csv")]
+        public async Task<IActionResult> ExportCsv()
+        {
+            var csv = await _service.ExportCsvAsync();
+            return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "bills.csv");
+        }
+    }
+}

@@ -1,0 +1,145 @@
+﻿using AdminService.Entities;
+using AdminService.Repositories;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using AdminService.Middleware;
+
+namespace AdminService.Services
+{
+public class UserService : IUserService
+{
+    private readonly IUserRepository _repo;
+    private readonly RabbitMqPublisher _rabbitMqPublisher;
+    public UserService(IUserRepository repo, RabbitMqPublisher rabbitMqPublisher)
+    {
+        _repo = repo;
+        _rabbitMqPublisher = rabbitMqPublisher;
+    }
+    public async Task<User> GetByIdAsync(Guid id) => await _repo.GetByIdAsync(id);
+    public async Task<IEnumerable<User>> GetAllAsync() => await _repo.GetAllAsync();
+    public async Task AddAsync(User user)
+    {
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(user.Email))
+            throw new BusinessException("Email is required");
+        if (string.IsNullOrWhiteSpace(user.UserName))
+            throw new BusinessException("UserName is required");
+        // Check for duplicate email
+        var existing = await _repo.GetAllAsync();
+        if (existing.Any(u => u.Email == user.Email))
+            throw new BusinessException($"User with email {user.Email} already exists");
+        await _repo.AddAsync(user);
+        var evt = new Events.AdminActionEvent
+        {
+            AdminId = user.Id, // or the actual admin performing the action if available
+            Action = "UserCreated",
+            Details = $"User {user.Email} created.",
+            ActionAt = DateTime.UtcNow
+        };
+        _rabbitMqPublisher.Publish(evt, "admin.action");
+    }
+
+    public async Task UpdateAsync(User user)
+    {
+        var existing = await _repo.GetByIdAsync(user.Id);
+        if (existing == null) throw new NotFoundException($"User with id {user.Id} not found");
+        await _repo.UpdateAsync(user);
+        var evt = new Events.AdminActionEvent
+        {
+            AdminId = user.Id, // or the actual admin performing the action if available
+            Action = "UserUpdated",
+            Details = $"User {user.Email} updated.",
+            ActionAt = DateTime.UtcNow
+        };
+        _rabbitMqPublisher.Publish(evt, "admin.action");
+    }
+
+    public async Task DeleteAsync(Guid id)
+    {
+        var user = await _repo.GetByIdAsync(id);
+        if (user == null) throw new NotFoundException($"User with id {id} not found");
+        await _repo.DeleteAsync(id);
+        var evt = new Events.AdminActionEvent
+        {
+            AdminId = id, // or the actual admin performing the action if available
+            Action = "UserDeleted",
+            Details = $"User {id} deleted.",
+            ActionAt = DateTime.UtcNow
+        };
+        _rabbitMqPublisher.Publish(evt, "admin.action");
+    }
+
+    // Event handlers for RabbitMQ events
+    public void HandleUserCreatedEvent(Events.UserCreatedEvent evt)
+    {
+        _ = HandleUserCreatedEventAsync(evt);
+
+    private async Task HandleUserCreatedEventAsync(Events.UserCreatedEvent evt)
+    {
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(evt.Email))
+        {
+            Console.WriteLine($"[AdminService] Skipped user creation: Email is required");
+            return;
+        }
+        // Check for duplicate email
+        var existing = await _repo.GetAllAsync();
+        if (existing.Any(u => u.Email == evt.Email))
+        {
+            Console.WriteLine($"[AdminService] User already exists in DB: {evt.Email}");
+            return;
+        }
+        var newUser = new Entities.User
+        {
+            Id = evt.UserId,
+            Email = evt.Email,
+            Role = evt.Role,
+            IsActive = true,
+            UserName = evt.Email // Or set to a default/empty value if not available
+        };
+        await _repo.AddAsync(newUser);
+        Console.WriteLine($"[AdminService] User added to DB: {evt.Email} ({evt.Role}) at {evt.CreatedAt}");
+    }
+    }
+
+    public void HandleUserRoleChangedEvent(Events.UserRoleChangedEvent evt)
+    {
+        _ = HandleUserRoleChangedEventAsync(evt);
+
+    private async Task HandleUserRoleChangedEventAsync(Events.UserRoleChangedEvent evt)
+    {
+        var user = await _repo.GetByIdAsync(evt.UserId);
+        if (user != null)
+        {
+            user.Role = evt.NewRole;
+            await _repo.UpdateAsync(user);
+            Console.WriteLine($"[AdminService] User role updated in DB: {evt.UserId} from {evt.OldRole} to {evt.NewRole} at {evt.ChangedAt}");
+        }
+        else
+        {
+            Console.WriteLine($"[AdminService] User not found for role change: {evt.UserId}");
+        }
+    }
+    }
+
+    public void HandleUserDeactivatedEvent(Events.UserDeactivatedEvent evt)
+    {
+        _ = HandleUserDeactivatedEventAsync(evt);
+
+    private async Task HandleUserDeactivatedEventAsync(Events.UserDeactivatedEvent evt)
+    {
+        var user = await _repo.GetByIdAsync(evt.UserId);
+        if (user != null)
+        {
+            user.IsActive = false;
+            await _repo.UpdateAsync(user);
+            Console.WriteLine($"[AdminService] User deactivated in DB: {evt.Email} at {evt.DeactivatedAt}");
+        }
+        else
+        {
+            Console.WriteLine($"[AdminService] User not found for deactivation: {evt.UserId}");
+        }
+    }
+    }
+}
+}

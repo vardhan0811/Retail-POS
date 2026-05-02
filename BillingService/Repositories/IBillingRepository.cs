@@ -9,6 +9,8 @@ namespace BillingService.Repositories
         Task<Bill?> GetByIdAsync(Guid id);
         Task<Bill?> GetByIdNoTrackingAsync(Guid id);
         Task<IEnumerable<Bill>> GetAllAsync();
+        IQueryable<Bill> GetAllQuery();
+        IQueryable<RefundRequest> GetAllRefundRequestsQuery();
         Task<IEnumerable<Bill>> GetByStatusAsync(BillStatus status);
         Task<IEnumerable<Bill>> GetByUserAsync(Guid userId);
         Task<IEnumerable<Bill>> GetByDateRangeAsync(DateTime start, DateTime end);
@@ -29,6 +31,15 @@ namespace BillingService.Repositories
         Task<Payment?> GetPaymentByIdAsync(Guid paymentId);
         Task<Payment?> GetSuccessfulPaymentByBillIdAsync(Guid billId);
         Task<(IReadOnlyList<Bill>, int)> GetPagedAsync(int page, int pageSize, string? status, Guid? userId, Guid? storeId, DateTime? start, DateTime? end, string? sortBy, string? search);
+        Task<SalesSummaryDto> GetSalesSummaryAsync(string? status, Guid? userId, Guid? storeId, DateTime? start, DateTime? end, string? search);
+        Task AddRefundRequestAsync(RefundRequest request);
+        Task<RefundRequest?> GetRefundRequestByIdAsync(Guid id);
+        Task UpdateRefundRequestAsync(RefundRequest request);
+        Task<IEnumerable<RefundRequest>> GetRefundRequestsV2Async(Guid? storeId, RefundStatus? status);
+        Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync();
         Task<string> ExportCsvAsync();
+        Task AddAuditLogAsync(BillAuditLog auditLog);
+        Task<IdempotencyRecord?> GetIdempotencyRecordAsync(string id);
+        Task AddIdempotencyRecordAsync(IdempotencyRecord record);
     }
 }

@@ -1,0 +1,19 @@
+﻿using AdminService.Entities;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Shared.Contracts.Events;
+
+namespace AdminService.Services
+{
+    public interface IUserService
+    {
+        Task<User?> GetByIdAsync(Guid id);
+        Task<IEnumerable<User>> GetAllAsync();
+        Task AddAsync(User user);
+        Task UpdateAsync(User user);
+        Task DeleteAsync(Guid id);
+
+        // Event handlers for RabbitMQ events
+        Task HandleUserCreatedEventAsync(UserCreatedEvent evt);
+    }
+}

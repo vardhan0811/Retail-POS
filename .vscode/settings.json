@@ -1,0 +1,7 @@
+{
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.tsdk": "pos-frontend/node_modules/typescript/lib",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifierEnding": "auto",
+  "angular.enable-strict-mode-prompt": false
+}

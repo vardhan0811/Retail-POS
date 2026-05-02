@@ -1,0 +1,119 @@
+﻿using AdminService.Data;
+using AdminService.Repositories;
+using AdminService.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using AdminService.Middleware;
+using Serilog;
+using System.Text;
+
+namespace AdminService
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+
+            // Logging (Serilog)
+            builder.Host.UseSerilog((ctx, lc) => lc
+                .WriteTo.Console()
+                .ReadFrom.Configuration(ctx.Configuration));
+
+            // DB
+            builder.Services.AddDbContext<AdminDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            // JWT AUTH
+            var jwtKey = builder.Configuration["Jwt:Key"];
+            var issuer = builder.Configuration["Jwt:Issuer"];
+            var audience = builder.Configuration["Jwt:Audience"];
+
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = issuer,
+
+                        ValidateAudience = true,
+                        ValidAudience = audience,   
+
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(jwtKey))
+                    };
+                });
+
+            // AUTHORIZATION POLICIES
+            builder.Services.AddAuthorization(options =>
+            {
+                options.AddPolicy("VIEW_ADMIN_DASHBOARD", policy => policy.RequireRole("Admin", "Cashier"));
+                options.AddPolicy("MANAGE_USERS", policy => policy.RequireRole("Admin"));
+                options.AddPolicy("VIEW_REPORTS", policy => policy.RequireRole("Admin", "Cashier"));
+                options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
+
+            // DEPENDENCIES
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<IAdminReportRepository, AdminReportRepository>();
+            builder.Services.AddScoped<IUserService, UserService>();
+            builder.Services.AddScoped<IAdminReportService, AdminReportService>();
+            builder.Services.AddHttpClient();
+            // RabbitMQ
+            builder.Services.AddSingleton<RabbitMqPublisherBase, RabbitMqPublisher>();
+            builder.Services.AddHostedService<RabbitMqConsumerHostedService>();
+
+            builder.Services.AddControllers();
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Enter 'Bearer <token>'"
+                });
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        new string[] {}
+                    }
+                });
+            });
+
+            var app = builder.Build();
+
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
+
+            app.UseMiddleware<ExceptionMiddleware>();
+            app.UseHttpsRedirection();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.MapControllers();
+            app.Run();
+        }
+    }
+}

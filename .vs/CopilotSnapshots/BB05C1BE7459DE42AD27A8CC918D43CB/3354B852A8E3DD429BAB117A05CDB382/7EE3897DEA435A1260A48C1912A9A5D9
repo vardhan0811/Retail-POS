@@ -1,0 +1,10 @@
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace BillingService.DTOs
+{
+    public class FinalizeBillRequest
+    {
+        [Required]
+        public Guid PaymentId { get; set; }
+    }
+}

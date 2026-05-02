@@ -1,0 +1,7 @@
+﻿namespace AuthService.DTOs
+{
+    public class UserDeactivateRequest
+    {
+        public Guid UserId { get; set; }
+    }
+}

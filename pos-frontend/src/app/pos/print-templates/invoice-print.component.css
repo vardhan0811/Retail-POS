@@ -1,0 +1,194 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap');
+
+:host {
+  display: block;
+  width: 210mm;
+  height: 297mm;
+  background: white;
+  color: #1e293b;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11pt;
+  padding: 15mm;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.invoice-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 20mm;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 4mm;
+}
+
+.logo {
+  width: 15mm;
+  height: 15mm;
+  color: #0f172a;
+}
+
+.brand-text h1 {
+  margin: 0;
+  font-size: 24pt;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+
+.brand-text p {
+  margin: 0;
+  font-size: 10pt;
+  color: #64748b;
+}
+
+.invoice-meta {
+  text-align: right;
+}
+
+.invoice-meta h2 {
+  margin: 0;
+  font-size: 28pt;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2mm 8mm;
+  margin-top: 5mm;
+  justify-content: end;
+}
+
+.meta-label {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 9pt;
+}
+
+.meta-value {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.billing-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20mm;
+  margin-bottom: 15mm;
+}
+
+.info-box h3 {
+  font-size: 10pt;
+  text-transform: uppercase;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 2mm;
+  margin-bottom: 4mm;
+}
+
+.info-content {
+  line-height: 1.6;
+}
+
+.items-table {
+  flex-grow: 1;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 9pt;
+  text-transform: uppercase;
+  padding: 4mm;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+td {
+  padding: 4mm;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.col-qty { width: 20mm; text-align: center; }
+.col-price { width: 35mm; text-align: right; }
+.col-total { width: 40mm; text-align: right; font-weight: 600; }
+
+.summary-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10mm;
+}
+
+.summary-box {
+  width: 80mm;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2mm 0;
+}
+
+.summary-row.grand-total {
+  border-top: 2px solid #0f172a;
+  margin-top: 2mm;
+  padding-top: 4mm;
+  font-size: 16pt;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: 10mm;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.signature {
+  width: 60mm;
+  text-align: center;
+}
+
+.sig-line {
+  border-top: 1px solid #0f172a;
+  margin-top: 15mm;
+  padding-top: 2mm;
+  font-size: 9pt;
+  font-weight: 600;
+}
+
+.terms {
+  font-size: 8pt;
+  color: #94a3b8;
+  max-width: 100mm;
+}
+
+@media print {
+  :host {
+    padding: 0;
+    margin: 0;
+  }
+}

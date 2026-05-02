@@ -8,13 +8,16 @@ namespace BillingService.DTOs
         public Guid BillId { get; set; }
         public string BillNumber { get; set; } = string.Empty;
         public string StoreName { get; set; } = "Retail POS Store"; // Ideally fetch from StoreClient
+        public string StoreGstin { get; set; } = string.Empty;
         public DateTime Date { get; set; }
+        public string Status { get; set; } = string.Empty;
         public string CashierId { get; set; } = string.Empty;
         
         public List<ReceiptItemDto> Items { get; set; } = new();
         
         public decimal SubTotal { get; set; }
         public decimal Tax { get; set; }
+        public decimal Discount { get; set; }
         public decimal Total { get; set; }
         
         public string PaymentMethod { get; set; } = string.Empty;

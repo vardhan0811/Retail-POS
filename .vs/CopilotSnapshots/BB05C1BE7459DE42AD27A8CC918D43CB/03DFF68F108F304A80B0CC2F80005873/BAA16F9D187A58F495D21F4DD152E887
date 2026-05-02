@@ -1,0 +1,24 @@
+﻿using ProductService.Entities;
+
+namespace ProductService.Repositories
+{
+    public interface IProductRepository
+    {
+        Task AddAsync(Product product);
+        Task<Product?> GetByIdAsync(Guid id);
+        Task<IEnumerable<Product>> SearchAsync(string query, Guid storeId);
+        Task UpdateAsync(Product product);
+        Task DeleteAsync(Product product);
+        Task<(IEnumerable<Product>, int)> GetPagedAsync(Guid storeId, int page, int pageSize, string? search, decimal? minPrice, decimal? maxPrice, string? sortBy);
+
+        // New endpoints
+        Task<IEnumerable<Product>> GetByCategoryAsync(Guid categoryId, Guid storeId);
+        Task<IEnumerable<Product>> GetLowStockAsync(Guid storeId, int threshold);
+        Task<IEnumerable<Product>> GetOutOfStockAsync(Guid storeId);
+        Task IncreaseStockAsync(Guid productId, int quantity);
+        Task DecreaseStockAsync(Guid productId, int quantity);
+        Task BulkUpdateStockAsync(IEnumerable<(Guid productId, int quantity)> updates);
+        Task<object> GetStockSummaryAsync(Guid storeId);
+        Task<IEnumerable<Product>> GetTopSellingAsync(Guid storeId, int count);
+    }
+}

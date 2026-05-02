@@ -1,0 +1,27 @@
+﻿{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "Jwt": {
+    "Key": "",
+    "Issuer": "AuthService",
+    "Audience": "ProductService",
+    "Audiences": [ "ApiGateway", "ProductService", "BillingService", "AdminService", "NotificationService", "AuthService" ]
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": ""
+  },
+  "RabbitMQ": {
+    "Host": "localhost",
+    "Username": "guest",
+    "Password": "guest",
+    "Exchange": "app.exchange",
+    "ExchangeType": "topic",
+    "DLX": "app.dlx",
+    "DLQ": "dead-letter-queue"
+  }
+}

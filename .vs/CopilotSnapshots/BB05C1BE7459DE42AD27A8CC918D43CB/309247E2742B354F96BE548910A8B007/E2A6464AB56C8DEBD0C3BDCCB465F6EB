@@ -1,0 +1,28 @@
+﻿using Microsoft.AspNetCore.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace AuthService.Middleware
+{
+    public class UnauthorizedResponseMiddleware
+    {
+        private readonly RequestDelegate _next;
+
+        public UnauthorizedResponseMiddleware(RequestDelegate next)
+        {
+            _next = next;
+        }
+
+        public async Task InvokeAsync(HttpContext context)
+        {
+            await _next(context);
+
+            if (context.Response.StatusCode == 401 && !context.Response.HasStarted)
+            {
+                context.Response.ContentType = "application/json";
+                var result = JsonSerializer.Serialize(new { error = "You are not authorized to access this resource." });
+                await context.Response.WriteAsync(result);
+            }
+        }
+    }
+}

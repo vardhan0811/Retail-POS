@@ -1,0 +1,17 @@
+﻿using AdminService.Entities;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Shared.Contracts.Events;
+
+namespace AdminService.Services
+{
+    public interface IUserService
+    {
+        Task<User?> GetByIdAsync(Guid id);
+        Task<IEnumerable<User>> GetAllAsync();
+
+        // RabbitMQ projection handler (AuthService -> AdminService)
+        Task HandleUserCreatedEventAsync(UserCreatedEvent evt);
+    }
+}

@@ -1,0 +1,54 @@
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddMemoryCache(); // For OTP storage
+builder.Services.AddScoped<NotificationService.Services.OtpService>();
+builder.Services.Configure<NotificationService.Services.EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddSingleton<NotificationService.Services.RabbitMqConsumer>();
+builder.Services.AddHostedService<NotificationService.Services.RabbitMqConsumerHostedService>();
+
+
+
+var audiences = builder.Configuration.GetSection("Jwt:Audiences").Get<string[]>();
+var issuer = builder.Configuration["Jwt:Issuer"];
+var jwtKey = builder.Configuration["Jwt:Key"];
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudiences = audiences,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+
+// Register global exception middleware
+app.UseMiddleware<NotificationService.Middleware.ExceptionMiddleware>();
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+app.Run();

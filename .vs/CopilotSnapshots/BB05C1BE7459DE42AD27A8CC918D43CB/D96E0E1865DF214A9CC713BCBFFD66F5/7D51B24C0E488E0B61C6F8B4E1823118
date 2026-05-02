@@ -1,0 +1,37 @@
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ProductService.DTOs
+{
+    public class CreateProductRequest
+    {
+        [Required]
+        [MaxLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(50)]
+        public string SKU { get; set; } = string.Empty;
+
+        [MaxLength(50)]
+        public string Barcode { get; set; } = string.Empty;
+
+        [Required]
+        [NotEmptyGuid(ErrorMessage = "CategoryId is required")]
+        public Guid CategoryId { get; set; }
+
+        [Required]
+        [NotEmptyGuid(ErrorMessage = "TaxId is required")]
+        public Guid TaxId { get; set; }
+
+        [Range(0.01, double.MaxValue, ErrorMessage = "MRP must be positive")]
+        public decimal MRP { get; set; }
+
+        [Range(0.01, double.MaxValue, ErrorMessage = "SellingPrice must be positive")]
+        public decimal SellingPrice { get; set; }
+
+        [Required]
+        [NotEmptyGuid(ErrorMessage = "StoreId is required")]
+        public Guid StoreId { get; set; }
+    }
+}

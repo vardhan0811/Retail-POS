@@ -1,0 +1,51 @@
+
+// PREMIUM RETAIL POS BILLING DESIGN SYSTEM
+// Inspired by Square, Stripe, and Apple Store
+
+:root {
+  --billing-primary: #0f172a;    // Deep Navy
+  --billing-accent: #10b981;     // Emerald
+  --billing-text-main: #1e293b;
+  --billing-text-muted: #64748b;
+  --billing-bg-white: #ffffff;
+  --billing-bg-alt: #f8fafc;
+  --billing-border: #e2e8f0;
+  
+  --billing-font-sans: 'Inter', 'Outfit', system-ui, -apple-system, sans-serif;
+  --billing-font-mono: 'Inconsolata', 'Fira Code', monospace;
+  
+  --rhythm-xs: 4px;
+  --rhythm-sm: 8px;
+  --rhythm-md: 12px;
+  --rhythm-lg: 24px;
+}
+
+// SHARED BULL LOGO COMPONENT (SVG-based)
+.billing-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--billing-primary);
+  
+  svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+  }
+  
+  &.accent { color: var(--billing-accent); }
+}
+
+// SHARED TYPOGRAPHY
+.billing-h1 { font-size: 24pt; font-weight: 900; letter-spacing: -0.04em; }
+.billing-h2 { font-size: 18pt; font-weight: 900; letter-spacing: -0.03em; }
+.billing-label { font-size: 7pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: var(--billing-text-muted); }
+.billing-value { font-size: 10pt; font-weight: 700; color: var(--billing-primary); }
+
+// UTILITIES
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.font-mono { font-family: var(--billing-font-mono); }
+.font-sans { font-family: var(--billing-font-sans); }
+.font-black { font-weight: 900; }
+.uppercase { text-transform: uppercase; }

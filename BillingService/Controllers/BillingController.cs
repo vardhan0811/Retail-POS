@@ -3,6 +3,9 @@ using BillingService.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using BillingService.Entities;
+
+using Microsoft.Extensions.Logging;
 
 namespace BillingService.Controllers
 {
@@ -11,10 +14,12 @@ namespace BillingService.Controllers
     public class BillingController : ControllerBase
     {
         private readonly IBillingService _service;
+        private readonly ILogger<BillingController> _logger;
 
-        public BillingController(IBillingService service)
+        public BillingController(IBillingService service, ILogger<BillingController> logger)
         {
             _service = service;
+            _logger = logger;
         }
 
         [Authorize(Policy = "CREATE_BILL")]
@@ -65,7 +70,11 @@ namespace BillingService.Controllers
         [HttpPost("{id}/hold")]
         public async Task<IActionResult> Hold(Guid id)
         {
-            await _service.HoldAsync(id);
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? throw new UnauthorizedAccessException("Missing NameIdentifier claim.");
+            if (!Guid.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+            await _service.HoldAsync(id, userId);
             return Ok(new ApiResponse<CommandResultDto>
             {
                 Success = true,
@@ -78,7 +87,12 @@ namespace BillingService.Controllers
         [HttpPost("{id}/resume")]
         public async Task<IActionResult> Resume(Guid id)
         {
-            await _service.ResumeAsync(id);
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? throw new UnauthorizedAccessException("Missing NameIdentifier claim.");
+            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "Cashier";
+            if (!Guid.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+            await _service.ResumeAsync(id, userId, role);
             return Ok(new ApiResponse<CommandResultDto>
             {
                 Success = true,
@@ -103,50 +117,18 @@ namespace BillingService.Controllers
             });
         }
 
-        [Authorize(Policy = "REFUND_BILL")]
-        [HttpPost("{id}/refund")]
-        public async Task<IActionResult> Refund(Guid id)
-        {
-            await _service.RefundAsync(id);
-            return Ok(new ApiResponse<CommandResultDto>
-            {
-                Success = true,
-                Message = "Refund action processed",
-                Data = new CommandResultDto { BillId = id, Action = "refund" }
-            });
-        }
 
-        [Authorize(Policy = "APPROVE_REFUND")]
-        [HttpPost("{id}/approve-refund")]
-        public async Task<IActionResult> ApproveRefund(Guid id)
-        {
-            await _service.ApproveRefundAsync(id);
-            return Ok(new ApiResponse<CommandResultDto>
-            {
-                Success = true,
-                Message = "Refund approved and items restocked",
-                Data = new CommandResultDto { BillId = id, Action = "approve-refund" }
-            });
-        }
-
-        [Authorize(Policy = "APPROVE_REFUND")]
-        [HttpPost("{id}/reject-refund")]
-        public async Task<IActionResult> RejectRefund(Guid id)
-        {
-            await _service.RejectRefundAsync(id);
-            return Ok(new ApiResponse<CommandResultDto>
-            {
-                Success = true,
-                Message = "Refund request rejected",
-                Data = new CommandResultDto { BillId = id, Action = "reject-refund" }
-            });
-        }
 
         [Authorize(Policy = "CREATE_BILL")]
         [HttpPost("{id}/cancel")]
         public async Task<IActionResult> Cancel(Guid id)
         {
-            await _service.CancelAsync(id);
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? throw new UnauthorizedAccessException("Missing NameIdentifier claim.");
+            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "Cashier";
+            if (!Guid.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+            await _service.CancelAsync(id, userId, role);
             return Ok(new ApiResponse<CommandResultDto>
             {
                 Success = true,
@@ -155,17 +137,5 @@ namespace BillingService.Controllers
             });
         }
 
-        [Authorize(Policy = "REPRINT_RECEIPT")]
-        [HttpPost("{id}/reprint-receipt")]
-        public async Task<IActionResult> ReprintReceipt(Guid id)
-        {
-            // Implement or remove logic, returning OK for now
-            return Ok(new ApiResponse<CommandResultDto>
-            {
-                Success = true,
-                Message = "Receipt reprinted successfully",
-                Data = new CommandResultDto { BillId = id, Action = "reprint-receipt" }
-            });
-        }
     }
 }

@@ -1,0 +1,4 @@
+﻿# Copilot Instructions
+
+## Project Guidelines
+- User expects strict layered architecture and robustness standards: avoid exposing entities in APIs, enforce DTO validation, add DB indexes/constraints for query and uniqueness patterns, include idempotency metadata in events, and maintain production-ready consistency across ProductService files.

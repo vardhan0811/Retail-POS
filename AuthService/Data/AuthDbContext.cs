@@ -1,4 +1,4 @@
-﻿using AuthService.Entities;
+using AuthService.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthService.Data
@@ -14,6 +14,9 @@ namespace AuthService.Data
         public DbSet<Role> Roles { get; set; }
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+        public DbSet<Terminal> Terminals { get; set; }
+        public DbSet<UserSession> UserSessions { get; set; }
+        public DbSet<AuthAuditLog> AuthAuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -42,13 +45,24 @@ namespace AuthService.Data
                 .HasIndex(u => u.StoreId);
 
             modelBuilder.Entity<User>()
+                .HasIndex(u => new { u.AuthProvider, u.ProviderUserId })
+                .IsUnique()
+                .HasFilter("[ProviderUserId] IS NOT NULL");
+
+            modelBuilder.Entity<User>()
                 .Property(u => u.Email)
                 .IsRequired()
                 .HasMaxLength(256);
 
             modelBuilder.Entity<User>()
                 .Property(u => u.PasswordHash)
-                .IsRequired();
+                .IsRequired(false);
+
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Role)
+                .WithMany()
+                .HasForeignKey(u => u.RoleId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Role>()
                 .HasIndex(r => r.Name)
@@ -57,6 +71,21 @@ namespace AuthService.Data
             modelBuilder.Entity<Permission>()
                 .HasIndex(p => p.Name)
                 .IsUnique();
+
+            modelBuilder.Entity<UserSession>()
+                .HasOne(us => us.User)
+                .WithMany()
+                .HasForeignKey(us => us.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<UserSession>()
+                .HasOne(us => us.Terminal)
+                .WithMany()
+                .HasForeignKey(us => us.TerminalId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<AuthAuditLog>()
+                .HasIndex(a => a.UserId);
         }
     }
 }

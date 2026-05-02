@@ -1,0 +1,26 @@
+﻿using Microsoft.EntityFrameworkCore;
+using AdminService.Entities;
+
+namespace AdminService.Data
+{
+    public class AdminDbContext : DbContext
+    {
+        public AdminDbContext(DbContextOptions<AdminDbContext> options) : base(options) { }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<AdminReport> AdminReports { get; set; }
+        public DbSet<Store> Stores { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            // Example: One User can have many AdminReports
+            modelBuilder.Entity<User>()
+                .HasMany<AdminReport>()
+                .WithOne()
+                .HasForeignKey("UserId")
+                .OnDelete(DeleteBehavior.Cascade);
+            // Add more relationships as needed
+        }
+    }
+}

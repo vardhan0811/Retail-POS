@@ -48,6 +48,118 @@ namespace AdminService.Controllers
             return productServiceBaseUrl.TrimEnd('/');
         }
 
+        // ---------------- PRODUCTS ----------------
+
+        [Authorize(Policy = "VIEW_ADMIN_READ")]
+        [HttpGet("products")]
+        public async Task<IActionResult> GetProducts(
+            [FromQuery] Guid? storeId = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? search = null,
+            [FromQuery] Guid? categoryId = null,
+            [FromQuery] string? sortBy = null)
+        {
+            var client = CreateClientWithAuth();
+            var url = $"{ProductBaseUrl()}/api/products?page={page}&pageSize={pageSize}";
+            if (storeId.HasValue) url += $"&storeId={storeId}";
+            if (!string.IsNullOrEmpty(search)) url += $"&search={Uri.EscapeDataString(search)}";
+            if (categoryId.HasValue) url += $"&categoryId={categoryId}";
+            if (!string.IsNullOrEmpty(sortBy)) url += $"&sortBy={sortBy}";
+
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to fetch products" });
+
+            var payload = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<ProductViewDto>>>();
+            return Ok(payload);
+        }
+
+        [Authorize(Policy = "VIEW_ADMIN_READ")]
+        [HttpGet("products/{id}")]
+        public async Task<IActionResult> GetProductById(Guid id)
+        {
+            var client = CreateClientWithAuth();
+            var response = await client.GetAsync($"{ProductBaseUrl()}/api/products/{id}");
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<ProductViewDto>>());
+        }
+
+        [Authorize(Policy = "MANAGE_CATALOG")]
+        [HttpPost("products")]
+        public async Task<IActionResult> CreateProduct([FromBody] object request) // Proxy objects
+        {
+            var client = CreateClientWithAuth();
+            var response = await client.PostAsJsonAsync($"{ProductBaseUrl()}/api/products", request);
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<ProductViewDto>>());
+        }
+
+        [Authorize(Policy = "MANAGE_CATALOG")]
+        [HttpPut("products/{id}")]
+        public async Task<IActionResult> UpdateProduct(Guid id, [FromBody] object request)
+        {
+            var client = CreateClientWithAuth();
+            var response = await client.PutAsJsonAsync($"{ProductBaseUrl()}/api/products/{id}", request);
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<object>>());
+        }
+
+        [Authorize(Policy = "MANAGE_CATALOG")]
+        [HttpPatch("products/{id}")]
+        public async Task<IActionResult> PatchProduct(Guid id, [FromBody] object request)
+        {
+            var client = CreateClientWithAuth();
+            var response = await client.PatchAsJsonAsync($"{ProductBaseUrl()}/api/products/{id}", request);
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<object>>());
+        }
+
+        [Authorize(Policy = "MANAGE_CATALOG")]
+        [HttpDelete("products/{id}")]
+        public async Task<IActionResult> DeleteProduct(Guid id)
+        {
+            var client = CreateClientWithAuth();
+            var response = await client.DeleteAsync($"{ProductBaseUrl()}/api/products/{id}");
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<object>>());
+        }
+
+        [Authorize(Policy = "MANAGE_CATALOG")] // Or specific stock policy
+        [HttpPut("products/{id}/stock")]
+        public async Task<IActionResult> AdjustStock(Guid id, [FromBody] object request)
+        {
+            var client = CreateClientWithAuth();
+            var response = await client.PutAsJsonAsync($"{ProductBaseUrl()}/api/products/{id}/stock", request);
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<object>>());
+        }
+
+        [Authorize(Policy = "VIEW_ADMIN_READ")]
+        [HttpGet("products/{id}/stock")]
+        public async Task<IActionResult> GetProductStock(Guid id)
+        {
+            var client = CreateClientWithAuth();
+            var response = await client.GetAsync($"{ProductBaseUrl()}/api/products/{id}/stock");
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<List<object>>>());
+        }
+
+        [Authorize(Policy = "VIEW_ADMIN_READ")]
+        [HttpGet("stock-summary")]
+        public async Task<IActionResult> GetStockSummary([FromQuery] Guid? storeId = null)
+        {
+            var client = CreateClientWithAuth();
+            var url = $"{ProductBaseUrl()}/api/products/stock-summary";
+            if (storeId.HasValue) url += $"?storeId={storeId}";
+
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+            return Ok(await response.Content.ReadFromJsonAsync<ApiResponse<StockSummaryDto>>());
+        }
+
+        // ---------------- CATEGORIES ----------------
+
         [Authorize(Policy = "VIEW_ADMIN_READ")]
         [HttpGet("categories")]
         public async Task<IActionResult> GetCategories()
@@ -59,12 +171,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to fetch categories", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<CategoryViewDto>>>();
-            return Ok(new ApiResponse<IReadOnlyList<CategoryViewDto>>
-            {
-                Success = true,
-                Message = "Categories fetched successfully",
-                Data = payload?.Data ?? Array.Empty<CategoryViewDto>()
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "VIEW_ADMIN_READ")]
@@ -78,12 +185,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to fetch category", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<CategoryViewDto>>();
-            return Ok(new ApiResponse<CategoryViewDto?>
-            {
-                Success = true,
-                Message = "Category fetched successfully",
-                Data = payload?.Data
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "MANAGE_CATALOG")]
@@ -100,12 +202,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to create category", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<CategoryViewDto>>();
-            return Ok(new ApiResponse<CategoryViewDto?>
-            {
-                Success = true,
-                Message = "Category created successfully",
-                Data = payload?.Data
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "MANAGE_CATALOG")]
@@ -122,12 +219,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to update category", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<CategoryViewDto>>();
-            return Ok(new ApiResponse<CategoryViewDto?>
-            {
-                Success = true,
-                Message = "Category updated successfully",
-                Data = payload?.Data
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "MANAGE_CATALOG")]
@@ -159,12 +251,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to fetch taxes", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<TaxViewDto>>>();
-            return Ok(new ApiResponse<IReadOnlyList<TaxViewDto>>
-            {
-                Success = true,
-                Message = "Taxes fetched successfully",
-                Data = payload?.Data ?? Array.Empty<TaxViewDto>()
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "VIEW_ADMIN_READ")]
@@ -178,12 +265,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to fetch tax", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<TaxViewDto>>();
-            return Ok(new ApiResponse<TaxViewDto?>
-            {
-                Success = true,
-                Message = "Tax fetched successfully",
-                Data = payload?.Data
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "MANAGE_CATALOG")]
@@ -200,12 +282,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to create tax", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<TaxViewDto>>();
-            return Ok(new ApiResponse<TaxViewDto?>
-            {
-                Success = true,
-                Message = "Tax created successfully",
-                Data = payload?.Data
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "MANAGE_CATALOG")]
@@ -222,12 +299,7 @@ namespace AdminService.Controllers
                 return StatusCode((int)response.StatusCode, new ApiResponse<object> { Success = false, Message = "Failed to update tax", Data = null });
 
             var payload = await response.Content.ReadFromJsonAsync<ApiResponse<TaxViewDto>>();
-            return Ok(new ApiResponse<TaxViewDto?>
-            {
-                Success = true,
-                Message = "Tax updated successfully",
-                Data = payload?.Data
-            });
+            return Ok(payload);
         }
 
         [Authorize(Policy = "MANAGE_CATALOG")]

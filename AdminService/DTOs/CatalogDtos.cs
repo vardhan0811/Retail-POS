@@ -50,4 +50,17 @@ namespace AdminService.DTOs
         [Range(0, 100)]
         public decimal Percentage { get; set; }
     }
+
+    /// <summary>
+    /// Aggregated stock health summary proxied from ProductService /api/products/stock-summary.
+    /// Scoped to a single store or all stores depending on the storeId query param.
+    /// </summary>
+    public class StockSummaryDto
+    {
+        public int TotalProducts { get; set; }
+        public int OutOfStockCount { get; set; }
+        public int LowStockCount { get; set; }
+        public decimal TotalStockValue { get; set; }
+        public Guid? StoreId { get; set; }
+    }
 }

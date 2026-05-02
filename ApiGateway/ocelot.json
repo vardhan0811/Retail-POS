@@ -1,5 +1,18 @@
 {
     "Routes": [
+        // Favicon
+        {
+            "DownstreamPathTemplate": "/favicon.ico",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5001
+                }
+            ],
+            "UpstreamPathTemplate": "/favicon.ico",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
         // Swagger (AuthService host)
         {
             "DownstreamPathTemplate": "/swagger/index.html",
@@ -62,6 +75,30 @@
             ],
             "UpstreamPathTemplate": "/api/auth/register",
             "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/auth/google-login",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5001
+                }
+            ],
+            "UpstreamPathTemplate": "/api/auth/google-login",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/auth/config/google",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5001
+                }
+            ],
+            "UpstreamPathTemplate": "/api/auth/config/google",
+            "UpstreamHttpMethod": [ "GET" ]
         },
         {
             "DownstreamPathTemplate": "/api/auth/me",
@@ -147,6 +184,43 @@
             "UpstreamPathTemplate": "/api/auth/logout",
             "UpstreamHttpMethod": [ "POST" ]
         },
+        {
+            "DownstreamPathTemplate": "/api/auth/session",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5001
+                }
+            ],
+            "UpstreamPathTemplate": "/api/auth/session",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/auth/login-history",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5001
+                }
+            ],
+            "UpstreamPathTemplate": "/api/auth/login-history",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/auth/sessions/start",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5001
+                }
+            ],
+            "UpstreamPathTemplate": "/api/auth/sessions/start",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+
 
         // BillingService
         {
@@ -234,7 +308,7 @@
             "UpstreamHttpMethod": [ "POST" ]
         },
         {
-            "DownstreamPathTemplate": "/api/bills/{id}/approve-refund",
+            "DownstreamPathTemplate": "/api/bills/{id}/refund/approve",
             "DownstreamScheme": "http",
             "DownstreamHostAndPorts": [
                 {
@@ -242,11 +316,11 @@
                     "Port": 5003
                 }
             ],
-            "UpstreamPathTemplate": "/api/bills/{id}/approve-refund",
+            "UpstreamPathTemplate": "/api/bills/{id}/refund/approve",
             "UpstreamHttpMethod": [ "POST" ]
         },
         {
-            "DownstreamPathTemplate": "/api/bills/{id}/reject-refund",
+            "DownstreamPathTemplate": "/api/bills/{id}/refund/reject",
             "DownstreamScheme": "http",
             "DownstreamHostAndPorts": [
                 {
@@ -254,7 +328,7 @@
                     "Port": 5003
                 }
             ],
-            "UpstreamPathTemplate": "/api/bills/{id}/reject-refund",
+            "UpstreamPathTemplate": "/api/bills/{id}/refund/reject",
             "UpstreamHttpMethod": [ "POST" ]
         },
         {
@@ -282,42 +356,6 @@
             "UpstreamHttpMethod": [ "GET" ]
         },
         {
-            "DownstreamPathTemplate": "/api/bills/reports/revenue",
-            "DownstreamScheme": "http",
-            "DownstreamHostAndPorts": [
-                {
-                    "Host": "localhost",
-                    "Port": 5003
-                }
-            ],
-            "UpstreamPathTemplate": "/api/bills/reports/revenue",
-            "UpstreamHttpMethod": [ "GET" ]
-        },
-        {
-            "DownstreamPathTemplate": "/api/bills/reports/sales",
-            "DownstreamScheme": "http",
-            "DownstreamHostAndPorts": [
-                {
-                    "Host": "localhost",
-                    "Port": 5003
-                }
-            ],
-            "UpstreamPathTemplate": "/api/bills/reports/sales",
-            "UpstreamHttpMethod": [ "GET" ]
-        },
-        {
-            "DownstreamPathTemplate": "/api/bills/reports/top-products",
-            "DownstreamScheme": "http",
-            "DownstreamHostAndPorts": [
-                {
-                    "Host": "localhost",
-                    "Port": 5003
-                }
-            ],
-            "UpstreamPathTemplate": "/api/bills/reports/top-products",
-            "UpstreamHttpMethod": [ "GET" ]
-        },
-        {
             "DownstreamPathTemplate": "/api/bills/export/csv",
             "DownstreamScheme": "http",
             "DownstreamHostAndPorts": [
@@ -341,6 +379,43 @@
             "UpstreamPathTemplate": "/api/bills/{id}/receipt",
             "UpstreamHttpMethod": [ "GET" ]
         },
+        {
+            "DownstreamPathTemplate": "/api/bills/{id}/receipt/email",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5003
+                }
+            ],
+            "UpstreamPathTemplate": "/api/bills/{id}/receipt/email",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/bills/dashboard/summary",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5003
+                }
+            ],
+            "UpstreamPathTemplate": "/api/bills/dashboard/summary",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/bills/dashboard/operator-summary",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5003
+                }
+            ],
+            "UpstreamPathTemplate": "/api/bills/dashboard/operator-summary",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+
 
         // BillingService (Payments)
         {
@@ -391,7 +466,7 @@
                 }
             ],
             "UpstreamPathTemplate": "/api/products/{id}",
-            "UpstreamHttpMethod": [ "GET", "PUT", "DELETE" ]
+            "UpstreamHttpMethod": [ "GET", "PUT", "PATCH", "DELETE" ]
         },
         {
             "DownstreamPathTemplate": "/api/products/search",
@@ -537,6 +612,79 @@
             "UpstreamPathTemplate": "/api/products/taxes/{id}",
             "UpstreamHttpMethod": [ "GET", "PUT", "DELETE" ]
         },
+        {
+            "DownstreamPathTemplate": "/api/products/inventory/update",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5002
+                }
+            ],
+            "UpstreamPathTemplate": "/api/products/inventory/update",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/products/{id}/stock",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5002
+                }
+            ],
+            "UpstreamPathTemplate": "/api/products/{id}/stock",
+            "UpstreamHttpMethod": [ "GET", "PUT" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/products/finalize-stock",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5002
+                }
+            ],
+            "UpstreamPathTemplate": "/api/products/finalize-stock",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+
+        // BillingService (Refunds V2)
+        {
+            "DownstreamPathTemplate": "/api/refunds/request",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5003 } ],
+            "UpstreamPathTemplate": "/api/refunds/request",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/refunds/{id}/approve",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5003 } ],
+            "UpstreamPathTemplate": "/api/refunds/{id}/approve",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/refunds/{id}/reject",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5003 } ],
+            "UpstreamPathTemplate": "/api/refunds/{id}/reject",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/refunds/{id}/settle",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5003 } ],
+            "UpstreamPathTemplate": "/api/refunds/{id}/settle",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/refunds",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5003 } ],
+            "UpstreamPathTemplate": "/api/refunds",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
 
         // AdminService
         {
@@ -588,6 +736,20 @@
             "UpstreamHttpMethod": [ "PUT" ]
         },
         {
+            "DownstreamPathTemplate": "/api/admin/users/{id}/approve",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+            "UpstreamPathTemplate": "/api/admin/users/{id}/approve",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/users/{id}/reject",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+            "UpstreamPathTemplate": "/api/admin/users/{id}/reject",
+            "UpstreamHttpMethod": [ "POST" ]
+        },
+        {
             "DownstreamPathTemplate": "/api/admin/stores",
             "DownstreamScheme": "http",
             "DownstreamHostAndPorts": [
@@ -636,6 +798,18 @@
             "UpstreamHttpMethod": [ "GET" ]
         },
         {
+            "DownstreamPathTemplate": "/api/admin/reports/summary",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5004
+                }
+            ],
+            "UpstreamPathTemplate": "/api/admin/reports/summary",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
             "DownstreamPathTemplate": "/api/admin/reports/revenue",
             "DownstreamScheme": "http",
             "DownstreamHostAndPorts": [
@@ -650,13 +824,43 @@
         {
             "DownstreamPathTemplate": "/api/admin/reports/top-products",
             "DownstreamScheme": "http",
-            "DownstreamHostAndPorts": [
-                {
-                    "Host": "localhost",
-                    "Port": 5004
-                }
-            ],
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
             "UpstreamPathTemplate": "/api/admin/reports/top-products",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/reports/kpi-summary",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+            "UpstreamPathTemplate": "/api/admin/reports/kpi-summary",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/reports/sales-trend",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+            "UpstreamPathTemplate": "/api/admin/reports/sales-trend",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/reports/refund-analytics",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+            "UpstreamPathTemplate": "/api/admin/reports/refund-analytics",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/reports/payment-breakdown",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+            "UpstreamPathTemplate": "/api/admin/reports/payment-breakdown",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/reports/export-csv",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+            "UpstreamPathTemplate": "/api/admin/reports/export-csv",
             "UpstreamHttpMethod": [ "GET" ]
         },
         {
@@ -706,6 +910,72 @@
             ],
             "UpstreamPathTemplate": "/api/admin/taxes/{id}",
             "UpstreamHttpMethod": [ "GET", "PUT", "DELETE" ]
+        },
+
+        // AdminService — Catalog (Products)
+        {
+            "DownstreamPathTemplate": "/api/admin/products",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5004
+                }
+            ],
+            "UpstreamPathTemplate": "/api/admin/products",
+            "UpstreamHttpMethod": [ "GET", "POST" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/products/{id}/stock",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5004
+                }
+            ],
+            "UpstreamPathTemplate": "/api/admin/products/{id}/stock",
+            "UpstreamHttpMethod": [ "GET", "PUT" ]
+        },
+        {
+            "DownstreamPathTemplate": "/api/admin/products/{id}",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5004
+                }
+            ],
+            "UpstreamPathTemplate": "/api/admin/products/{id}",
+            "UpstreamHttpMethod": [ "GET", "PUT", "DELETE" ]
+        },
+
+        // AdminService — Stock summary (aggregated)
+        {
+            "DownstreamPathTemplate": "/api/admin/stock-summary",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5004
+                }
+            ],
+            "UpstreamPathTemplate": "/api/admin/stock-summary",
+            "UpstreamHttpMethod": [ "GET" ]
+        },
+
+        // AdminService — User store assignment
+        {
+            "DownstreamPathTemplate": "/api/admin/users/{id}/stores",
+            "DownstreamScheme": "http",
+            "DownstreamHostAndPorts": [
+                {
+                    "Host": "localhost",
+                    "Port": 5004
+                }
+            ],
+            "UpstreamPathTemplate": "/api/admin/users/{id}/stores",
+            "UpstreamHttpMethod": [ "PUT" ]
         },
         {
             "DownstreamPathTemplate": "/api/admin/roles",

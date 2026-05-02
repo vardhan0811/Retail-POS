@@ -1,0 +1,170 @@
+﻿using AuthService.DTOs;
+using AuthService.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using AuthService.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace AuthService.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class AuthController : ControllerBase
+    {
+        private readonly IAuthService _authService;
+        private readonly AuthDbContext _db;
+        private readonly RefreshTokenService _refreshTokenService;
+
+        public AuthController(IAuthService authService, AuthDbContext db, RefreshTokenService refreshTokenService)
+        {
+            _authService = authService;
+            _db = db;
+            _refreshTokenService = refreshTokenService;
+        }
+
+        [HttpGet("store/{id}")]
+        public async Task<IActionResult> GetStoreById(Guid id)
+        {
+            var store = await _db.Stores.FindAsync(id);
+            if (store == null)
+                return NotFound();
+            return Ok();
+        }
+
+        [HttpPost("register")]
+        public async Task<IActionResult> Register(RegisterRequest request)
+        {
+            await _authService.RegisterAsync(request);
+            return Ok(new ApiResponse<string>
+            {
+                Success = true,
+                Message = "User registered",
+                Data = null
+            });
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login(LoginRequest request)
+        {
+            var response = await _authService.LoginAsync(request);
+            // Find user by email
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            if (user == null)
+                return Unauthorized(new ApiResponse<string> { Success = false, Message = "Invalid credentials", Data = null });
+
+            // Generate and store refresh token
+            var refreshToken = _refreshTokenService.GenerateRefreshToken(user.Id);
+            Response.Cookies.Append("refreshToken", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Login successful",
+                Data = response
+            });
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh()
+        {
+            // Get refresh token from cookie
+            if (!Request.Cookies.TryGetValue("refreshToken", out var refreshToken))
+                return Unauthorized(new ApiResponse<string> { Success = false, Message = "No refresh token", Data = null });
+
+            // Find user by refresh token (brute-force, but safe for demo)
+            var user = _db.Users.ToList().FirstOrDefault(u => _refreshTokenService.ValidateRefreshToken(u.Id, refreshToken));
+            if (user == null)
+                return Unauthorized(new ApiResponse<string> { Success = false, Message = "Invalid refresh token", Data = null });
+
+            // Generate new JWT and refresh token (rotate)
+            var permissions = user.Role?.RolePermissions?.Select(rp => rp.Permission.Name).ToList() ?? new List<string>();
+            var jwtService = HttpContext.RequestServices.GetRequiredService<IJwtService>();
+            var newJwt = jwtService.GenerateToken(user, permissions);
+            var newRefreshToken = _refreshTokenService.GenerateRefreshToken(user.Id);
+            Response.Cookies.Append("refreshToken", newRefreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Token refreshed",
+                Data = new { Token = newJwt, Email = user.Email }
+            });
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult GetMe()
+        {
+            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            return Ok(new ApiResponse<string>
+            {
+                Success = true,
+                Message = "User info fetched successfully",
+                Data = email
+            });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("change-role")]
+        public async Task<IActionResult> ChangeUserRole([FromBody] UserRoleChangeRequest request)
+        {
+            await _authService.ChangeUserRoleAsync(request);
+            return Ok(new ApiResponse<string>
+            {
+                Success = true,
+                Message = "User role changed",
+                Data = null
+            });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("deactivate")]
+        public async Task<IActionResult> DeactivateUser([FromBody] UserDeactivateRequest request)
+        {
+            await _authService.DeactivateUserAsync(request);
+            return Ok(new ApiResponse<string>
+            {
+                Success = true,
+                Message = "User deactivated",
+                Data = null
+            });
+        }
+
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyOtp([FromQuery] string email, [FromQuery] string otp)
+        {
+            var result = await _authService.VerifyOtpAsync(email, otp);
+            if (result)
+            {
+                return Ok(new ApiResponse<string>
+                {
+                    Success = true,
+                    Message = "OTP verified.",
+                    Data = null
+                });
+            }
+            else
+            {
+                return BadRequest(new ApiResponse<string>
+                {
+                    Success = false,
+                    Message = "Invalid or expired OTP.",
+                    Data = null
+                });
+            }
+        }
+    }
+}

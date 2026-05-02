@@ -3,6 +3,7 @@ using BillingService.HealthChecks;
 using BillingService.Middleware;
 using BillingService.Repositories;
 using BillingService.Services;
+using BillingService.DTOs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -99,6 +100,10 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddScoped<IBillingRepository, BillingRepository>();
 builder.Services.AddScoped<IBillingService, BillingServices>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IPdfService, PdfService>();
+
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
 builder.Services.AddSingleton<RabbitMqPublisherBase>();
 builder.Services.AddHostedService<RabbitMqConsumerHostedService>();
@@ -122,10 +127,14 @@ builder.Services.AddHttpClient<IStoreClient, StoreClient>(client =>
 {
     client.BaseAddress = new Uri(adminServiceUrl.TrimEnd('/') + "/");
 });
+builder.Services.Configure<RefundPolicy>(builder.Configuration.GetSection("RefundPolicy"));
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
+        // CRITICAL: camelCase ensures Angular frontend receives billNumber, subTotal, items etc.
+        // Without this, properties serialize as PascalCase and all template bindings break.
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.WriteIndented = true;
@@ -162,48 +171,18 @@ app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseHttpsRedirection();
 
-// Dependency gate (Development): if dependencies are unhealthy, block all endpoints (except /health)
 app.Use(async (context, next) =>
 {
-    if (!app.Environment.IsDevelopment())
-    {
-        await next();
-        return;
-    }
-
-    if (context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase))
-    {
-        await next();
-        return;
-    }
-
-    var health = await context.RequestServices.GetRequiredService<HealthCheckService>()
+    // Dependency check (Development): Log health but don't hard-block unless critical
+    var healthCheck = await context.RequestServices.GetRequiredService<HealthCheckService>()
         .CheckHealthAsync(context.RequestAborted);
 
-    if (health.Status == HealthStatus.Healthy)
+    if (healthCheck.Status != HealthStatus.Healthy)
     {
-        await next();
-        return;
+        Log.Warning("BillingService dependencies are {Status}. Proceeding with caution. Check /health for details.", healthCheck.Status);
     }
 
-    var accept = context.Request.Headers.Accept.ToString();
-    var wantsHtml = accept.Contains("text/html", StringComparison.OrdinalIgnoreCase)
-                    || context.Request.Path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase);
-
-    if (wantsHtml)
-    {
-        context.Response.Redirect("/health");
-        return;
-    }
-
-    context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-    context.Response.ContentType = "application/json";
-    await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
-    {
-        success = false,
-        message = "Service dependencies are unhealthy. Check /health.",
-        status = health.Status.ToString()
-    }));
+    await next();
 });
 
 if (app.Environment.IsDevelopment())

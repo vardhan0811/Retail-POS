@@ -32,15 +32,43 @@ namespace BillingService.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("EmailRecipient")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EmailResendCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EmailedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("FinalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<bool>("IsEmailed")
+                        .HasColumnType("bit");
+
                     b.Property<Guid?>("PaymentId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("RefundApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RefundStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -48,11 +76,21 @@ namespace BillingService.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<Guid>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("SuspendedBy")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("TaxAmount")
@@ -78,6 +116,41 @@ namespace BillingService.Migrations
                     b.ToTable("Bills");
                 });
 
+            modelBuilder.Entity("BillingService.Entities.BillAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("NewState")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldState")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillId");
+
+                    b.ToTable("BillAuditLogs");
+                });
+
             modelBuilder.Entity("BillingService.Entities.BillItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -86,6 +159,12 @@ namespace BillingService.Migrations
 
                     b.Property<Guid>("BillId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsRefundable")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRefunded")
+                        .HasColumnType("bit");
 
                     b.Property<decimal>("MRP")
                         .HasPrecision(18, 2)
@@ -99,6 +178,12 @@ namespace BillingService.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RefundWindowHours")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RefundedQuantity")
                         .HasColumnType("int");
 
                     b.Property<decimal>("TaxPercentage")
@@ -118,6 +203,26 @@ namespace BillingService.Migrations
                     b.HasIndex("BillId");
 
                     b.ToTable("BillItems");
+                });
+
+            modelBuilder.Entity("BillingService.Entities.IdempotencyRecord", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ResponseBody")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("IdempotencyRecords");
                 });
 
             modelBuilder.Entity("BillingService.Entities.Payment", b =>
@@ -154,6 +259,222 @@ namespace BillingService.Migrations
                     b.ToTable("Payments");
                 });
 
+            modelBuilder.Entity("BillingService.Entities.RefundItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BillItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("RefundRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("SystemCalculatedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TaxPercentageAtTimeOfSale")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("TaxReversalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPriceAtTimeOfSale")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillItemId");
+
+                    b.HasIndex("RefundRequestId");
+
+                    b.ToTable("RefundItems");
+                });
+
+            modelBuilder.Entity("BillingService.Entities.RefundRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BillItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsOverridden")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("OverriddenAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("OverrideReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ProcessedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("StatusDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("StoreName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("SystemCalculatedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TaxReversalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillId");
+
+                    b.ToTable("RefundRecords");
+                });
+
+            modelBuilder.Entity("BillingService.Entities.RefundRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AdminNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("RejectedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RequestedByEmail")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestedByName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("SettledBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("StoreName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("TotalRefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillId");
+
+                    b.ToTable("RefundRequests");
+                });
+
+            modelBuilder.Entity("BillingService.Entities.BillAuditLog", b =>
+                {
+                    b.HasOne("BillingService.Entities.Bill", "Bill")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bill");
+                });
+
             modelBuilder.Entity("BillingService.Entities.BillItem", b =>
                 {
                     b.HasOne("BillingService.Entities.Bill", "Bill")
@@ -168,6 +489,36 @@ namespace BillingService.Migrations
             modelBuilder.Entity("BillingService.Entities.Payment", b =>
                 {
                     b.HasOne("BillingService.Entities.Bill", "Bill")
+                        .WithMany("Payments")
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bill");
+                });
+
+            modelBuilder.Entity("BillingService.Entities.RefundItem", b =>
+                {
+                    b.HasOne("BillingService.Entities.BillItem", "BillItem")
+                        .WithMany()
+                        .HasForeignKey("BillItemId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("BillingService.Entities.RefundRequest", "RefundRequest")
+                        .WithMany("Items")
+                        .HasForeignKey("RefundRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BillItem");
+
+                    b.Navigation("RefundRequest");
+                });
+
+            modelBuilder.Entity("BillingService.Entities.RefundRecord", b =>
+                {
+                    b.HasOne("BillingService.Entities.Bill", "Bill")
                         .WithMany()
                         .HasForeignKey("BillId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -176,7 +527,29 @@ namespace BillingService.Migrations
                     b.Navigation("Bill");
                 });
 
+            modelBuilder.Entity("BillingService.Entities.RefundRequest", b =>
+                {
+                    b.HasOne("BillingService.Entities.Bill", "Bill")
+                        .WithMany("RefundRequests")
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bill");
+                });
+
             modelBuilder.Entity("BillingService.Entities.Bill", b =>
+                {
+                    b.Navigation("AuditLogs");
+
+                    b.Navigation("Items");
+
+                    b.Navigation("Payments");
+
+                    b.Navigation("RefundRequests");
+                });
+
+            modelBuilder.Entity("BillingService.Entities.RefundRequest", b =>
                 {
                     b.Navigation("Items");
                 });

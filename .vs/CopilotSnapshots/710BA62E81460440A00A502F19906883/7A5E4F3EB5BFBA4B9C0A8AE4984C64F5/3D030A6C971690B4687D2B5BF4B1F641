@@ -1,0 +1,109 @@
+﻿using AdminService.Entities;
+using AdminService.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using AdminService.DTOs;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("admin/[controller]")]
+    public class UserController : ControllerBase
+    {
+        private readonly IUserService _service;
+        public UserController(IUserService service) { _service = service; }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var users = await _service.GetAllAsync();
+            return Ok(new AdminService.DTOs.ApiResponse<IEnumerable<Entities.User>>
+            {
+                Success = true,
+                Message = "Users fetched successfully",
+                Data = users
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var user = await _service.GetByIdAsync(id);
+            if (user == null)
+                return NotFound(new AdminService.DTOs.ApiResponse<Entities.User>
+                {
+                    Success = false,
+                    Message = "User not found",
+                    Data = null
+                });
+            return Ok(new AdminService.DTOs.ApiResponse<Entities.User>
+            {
+                Success = true,
+                Message = "User fetched successfully",
+                Data = user
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreateUserRequest request)
+        {
+            // Allowed roles
+            var allowedRoles = new[] { "Admin", "Cashier" };
+            if (string.IsNullOrWhiteSpace(request.UserName))
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "UserName is required", Data = null });
+            if (string.IsNullOrWhiteSpace(request.Email))
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Email is required", Data = null });
+            if (string.IsNullOrWhiteSpace(request.Role) || !allowedRoles.Contains(request.Role))
+                return BadRequest(new ApiResponse<object> { Success = false, Message = $"Role must be one of: {string.Join(", ", allowedRoles)}", Data = null });
+
+            var user = new Entities.User
+            {
+                Id = Guid.NewGuid(),
+                UserName = request.UserName,
+                Email = request.Email,
+                Role = request.Role,
+                IsActive = true
+            };
+            await _service.AddAsync(user);
+            return Ok(new ApiResponse<Entities.User>
+            {
+                Success = true,
+                Message = "User created successfully",
+                Data = user
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] User user)
+        {
+            user.Id = id;
+            await _service.UpdateAsync(user);
+            return Ok(new AdminService.DTOs.ApiResponse<Entities.User>
+            {
+                Success = true,
+                Message = "User updated successfully",
+                Data = user
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            await _service.DeleteAsync(id);
+            return Ok(new AdminService.DTOs.ApiResponse<object>
+            {
+                Success = true,
+                Message = "User deleted successfully",
+                Data = null
+            });
+        }
+    }
+}

@@ -1,0 +1,42 @@
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Shared.Contracts.Events;
+using System;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace AdminService.Services
+{
+    public sealed class RabbitMqConsumerHostedService : RabbitMqConsumerBase
+    {
+        private readonly IServiceScopeFactory _scopeFactory;
+
+        public RabbitMqConsumerHostedService(
+            IConfiguration config,
+            ILogger<RabbitMqConsumerHostedService> logger,
+            IServiceScopeFactory scopeFactory)
+            : base(config, logger, queueName: "admin.user.created", routingKeys: "user.created")
+        {
+            _scopeFactory = scopeFactory;
+        }
+
+        protected override async Task ProcessMessageAsync(byte[] body, string routingKey, CancellationToken ct)
+        {
+            var json = Encoding.UTF8.GetString(body);
+
+            var evt = JsonSerializer.Deserialize<UserCreatedEvent>(
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (evt == null)
+                throw new InvalidOperationException("Failed to deserialize UserCreatedEvent.");
+
+            using var scope = _scopeFactory.CreateScope();
+            var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+            await userService.HandleUserCreatedEventAsync(evt);
+        }
+    }
+}

@@ -1,0 +1,13 @@
+﻿{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft.AspNetCore": "Warning"
+        }
+    },
+    "AllowedHosts": "*",
+    "EmailSettings": {
+        "FromEmail": "rayapureddyvardhan2004@gmail.com",
+        "AppPassword": "idsruieobjaoygpa"
+    }
+}

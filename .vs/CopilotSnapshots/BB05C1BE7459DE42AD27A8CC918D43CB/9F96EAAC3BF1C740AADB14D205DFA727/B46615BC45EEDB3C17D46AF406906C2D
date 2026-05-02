@@ -1,0 +1,20 @@
+﻿using AdminService.Entities;
+using AdminService.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Shared.Contracts.Events;
+
+namespace AdminService.Services
+{
+    public interface IUserService
+    {
+        Task<User?> GetByIdAsync(Guid id);
+        Task<IEnumerable<User>> GetAllAsync();
+        Task<User> UpdateRoleAsync(Guid id, UpdateUserRoleRequest request);
+        Task<User> UpdateStatusAsync(Guid id, UpdateUserStatusRequest request);
+
+        // RabbitMQ projection handler (AuthService -> AdminService)
+        Task HandleUserCreatedEventAsync(UserCreatedEvent evt);
+    }
+}

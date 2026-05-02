@@ -1,0 +1,98 @@
+<div class="invoice-wrapper">
+  <div class="header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 4L14 8L18 9L15 12L16 16L12 14L8 16L9 12L6 9L10 8L12 4Z" fill="currentColor"/>
+        <path d="M4 10C4 10 6 7 12 7C18 7 20 10 20 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <div class="brand-text">
+        <h1>RETAIL POS</h1>
+        <p>Premium Retail Experience</p>
+      </div>
+    </div>
+
+    <div class="invoice-meta">
+      <h2>INVOICE</h2>
+      <div class="meta-grid">
+        <span class="meta-label">INVOICE NO</span>
+        <span class="meta-value">#{{ data?.billNumber }}</span>
+        <span class="meta-label">DATE</span>
+        <span class="meta-value">{{ formattedDate }}</span>
+        <span class="meta-label">STATUS</span>
+        <span class="meta-value">{{ data?.status | uppercase }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="billing-info">
+    <div class="info-box">
+      <h3>Store Details</h3>
+      <div class="info-content">
+        <strong>{{ data?.storeName }}</strong><br>
+        {{ data?.storeAddress }}<br>
+        Cashier ID: {{ data?.cashierId }}
+      </div>
+    </div>
+    <div class="info-box">
+      <h3>Payment Details</h3>
+      <div class="info-content">
+        Method: {{ data?.paymentMethod }}<br>
+        Transaction ID: {{ data?.paymentId }}<br>
+        Reference: {{ data?.transactionReference }}
+      </div>
+    </div>
+  </div>
+
+  <div class="items-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="col-qty">Qty</th>
+          <th class="col-price">Unit Price</th>
+          <th class="col-total">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of data?.items">
+          <td>{{ item.name }}</td>
+          <td class="col-qty">{{ item.quantity }}</td>
+          <td class="col-price">{{ item.unitPrice | number:'1.2-2' }}</td>
+          <td class="col-total">{{ item.totalPrice | number:'1.2-2' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary-section">
+    <div class="summary-box">
+      <div class="summary-row">
+        <span>Subtotal</span>
+        <span>{{ data?.subTotal | number:'1.2-2' }}</span>
+      </div>
+      <div class="summary-row">
+        <span>Tax (GST/VAT)</span>
+        <span>{{ data?.tax | number:'1.2-2' }}</span>
+      </div>
+      <div *ngIf="data?.discount > 0" class="summary-row" style="color: #10b981;">
+        <span>Discount</span>
+        <span>-{{ data?.discount | number:'1.2-2' }}</span>
+      </div>
+      <div class="summary-row grand-total">
+        <span>TOTAL DUE</span>
+        <span>${{ data?.total | number:'1.2-2' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="terms">
+      <strong>Terms & Conditions</strong><br>
+      Goods once sold are only refundable within the specified window ({{ data?.refundWindowHours || 24 }}h). 
+      This is a computer-generated invoice and does not require a physical signature.
+    </div>
+    <div class="signature">
+      <div class="sig-line">Authorized Signatory</div>
+    </div>
+  </div>
+</div>

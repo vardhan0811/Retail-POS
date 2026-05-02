@@ -1,0 +1,166 @@
+﻿using AuthService.Data;
+using AuthService.DTOs;
+using AuthService.Entities;
+using AuthService.Repositories;
+using Microsoft.EntityFrameworkCore;
+using AuthService.Middleware;
+using AuthService.Utils;
+using Shared.Contracts.Events;
+using Shared.Messaging.RabbitMq;
+
+namespace AuthService.Services
+{
+public class AuthServices : IAuthService
+{
+    private readonly IUserRepository _userRepository;
+    private readonly IJwtService _jwtService;
+    private readonly AuthDbContext _context;
+    private readonly RabbitMqPublisherBase _rabbitMqPublisher;
+    private readonly NotificationClient _notificationClient;
+    private readonly RegistrationCacheService _registrationCacheService;
+
+    public AuthServices(
+        IUserRepository userRepository,
+        IJwtService jwtService,
+        AuthDbContext context,
+        RabbitMqPublisherBase rabbitMqPublisher,
+        NotificationClient notificationClient,
+        RegistrationCacheService registrationCacheService)
+    {
+        _userRepository = userRepository;
+        _jwtService = jwtService;
+        _context = context;
+        _rabbitMqPublisher = rabbitMqPublisher;
+        _notificationClient = notificationClient;
+        _registrationCacheService = registrationCacheService;
+    }
+
+        public async Task RegisterAsync(RegisterRequest request)
+        {
+            request.Email = request.Email.Trim().ToLowerInvariant();
+
+            // Step 0: Strong Gmail email validation
+            EmailValidator.ValidateGmail(request.Email);
+
+            // Step 1: Check existing user
+            var exists = await _userRepository.ExistsByEmailAsync(request.Email);
+            if (exists)
+                throw new BusinessException("User already exists");
+
+            // Step 2: Send OTP to email
+            var otpSent = await _notificationClient.SendOtpAsync(request.Email);
+            if (!otpSent)
+                throw new BusinessException("Failed to send OTP. Please try again.");
+
+            // Step 3: Store registration details in cache until OTP is verified
+            _registrationCacheService.StoreRegistration(request.Email, request);
+            // User is NOT created yet. Wait for OTP verification.
+        }
+
+        public async Task<bool> VerifyOtpAsync(string email, string otp)
+        {
+            email = email.Trim().ToLowerInvariant();
+
+            var otpValid = await _notificationClient.VerifyOtpAsync(email, otp);
+            if (!otpValid)
+                return false;
+
+            // if otp is valid then it retrieves the registration details from cache(IMemoryCache)
+            var request = _registrationCacheService.GetRegistration(email);
+            if (request == null)
+                return false;
+
+            // Check again if user already exists (race condition safety)
+            var exists = await _userRepository.ExistsByEmailAsync(email);
+            if (exists)
+                return false;
+
+            // Get default role (Cashier)
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Cashier");
+            if (role == null)
+                throw new NotFoundException("Cashier role not found");
+
+            // Hash password
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            // Create user
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Name = request.Name,
+                Email = request.Email,
+                PasswordHash = passwordHash,
+                RoleId = role.Id,
+                StoreId = request.StoreId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _userRepository.AddAsync(user);
+
+            // Publish UserCreatedEvent to RabbitMQ (Shared.Contracts.Events)
+            var evt = new UserCreatedEvent
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = Guid.NewGuid(),
+                UserId = user.Id,
+                Email = user.Email,
+                UserName = user.Name,
+                Role = role.Name,
+                CreatedAt = user.CreatedAt
+            };
+            _rabbitMqPublisher.Publish(evt, "user.created");
+
+            // Remove registration from cache
+            _registrationCacheService.RemoveRegistration(email);
+
+            return true;
+        }
+
+        
+
+        public async Task<AuthResponse> LoginAsync(LoginRequest request)
+        {
+            request.Email = request.Email.Trim().ToLowerInvariant();
+
+            // 🔹 Step 1: Fetch user with role + permissions
+          var user = await _userRepository.GetUserWithRoleAndPermissions(request.Email);
+
+            if (user == null)
+                throw new NotFoundException("Invalid credentials");
+
+            if (!user.IsActive)
+                throw new BusinessException("Your account has been deactivated by the admin.");
+
+            // 🔹 Step 2: Verify password
+            var isValid = BCrypt.Net.BCrypt.Verify(
+                request.Password,
+                user.PasswordHash);
+
+            if (!isValid)
+                throw new BusinessException("Invalid credentials");
+
+            // 🔹 Step 3: Extract permissions safely
+            var permissions = user.Role?.RolePermissions?
+                .Select(rp => rp.Permission.Name)
+                .ToList() ?? new List<string>();
+
+            // 🔹 Step 4: Generate JWT
+            var token = _jwtService.GenerateToken(user, permissions);
+
+            // 🔹 Step 5: (No RabbitMQ publish allowed for login)
+
+            // 🔹 Step 6: Return response
+            return new AuthResponse
+            {
+                Token = token,
+                Email = user.Email,
+                UserId = user.Id,
+                Role = user.Role?.Name ?? string.Empty,
+                Permissions = permissions,
+                StoreId = user.StoreId
+            };
+        }
+
+    }
+}

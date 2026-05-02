@@ -1,0 +1,9 @@
+﻿using BillingService.Entities;
+
+namespace BillingService.Repositories
+{
+    public interface IBillingRepository
+    {
+        Task AddAsync(Bill bill);
+    }
+}

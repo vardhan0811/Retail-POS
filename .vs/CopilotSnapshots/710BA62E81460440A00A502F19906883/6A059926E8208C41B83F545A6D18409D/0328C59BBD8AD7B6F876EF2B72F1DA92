@@ -1,0 +1,77 @@
+﻿using AdminService.Entities;
+using AdminService.Repositories;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using AdminService.Middleware;
+using AdminService.Events;
+using Shared.Contracts.Events;
+
+namespace AdminService.Services
+{
+    public class UserService : IUserService
+    {
+        private readonly IUserRepository _repo;
+
+        public UserService(IUserRepository repo)
+        {
+            _repo = repo;
+        }
+
+        public async Task<User> GetByIdAsync(Guid id) => await _repo.GetByIdAsync(id);
+        public async Task<IEnumerable<User>> GetAllAsync() => await _repo.GetAllAsync();
+
+        public async Task AddAsync(User user)
+        {
+            if (string.IsNullOrWhiteSpace(user.Email))
+                throw new BusinessException("Email is required");
+
+            if (string.IsNullOrWhiteSpace(user.UserName))
+                throw new BusinessException("UserName is required");
+
+            var existing = await _repo.GetAllAsync();
+            if (existing.Any(u => u.Email == user.Email))
+                throw new BusinessException($"User with email {user.Email} already exists");
+
+            if (!string.IsNullOrWhiteSpace(user.PasswordHash))
+            {
+                user.PasswordHash = user.PasswordHash;
+            }
+
+            await _repo.AddAsync(user);
+        }
+
+        public async Task UpdateAsync(User user)
+        {
+            var existing = await _repo.GetByIdAsync(user.Id);
+            if (existing == null) throw new NotFoundException($"User with id {user.Id} not found");
+
+            await _repo.UpdateAsync(user);
+        }
+
+        public async Task HandleUserCreatedEventAsync(UserCreatedEvent evt)
+        {
+            var existing = await _repo.GetByIdAsync(evt.UserId);
+
+            if (existing == null)
+            {
+                await _repo.AddAsync(new AdminService.Entities.User
+                {
+                    Id = evt.UserId,
+                    UserName = evt.UserName,
+                    Email = evt.Email,
+                    Role = evt.Role,
+                    IsActive = true,
+                    PasswordHash = null
+                });
+                return;
+            }
+
+            existing.UserName = evt.UserName;
+            existing.Email = evt.Email;
+            existing.Role = evt.Role;
+            existing.IsActive = true;
+
+            await _repo.UpdateAsync(existing);
+        }
+    }
+}

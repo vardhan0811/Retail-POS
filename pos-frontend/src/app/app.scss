@@ -1,0 +1,92 @@
+// Material shell layout styles
+.app-shell {
+	height: 100vh;
+}
+
+.main-content {
+	padding: 24px;
+	min-height: calc(100vh - 64px);
+	background: var(--mat-sys-surface-container, #23272f);
+	color: var(--mat-sys-on-surface, #fff);
+}
+
+.auth-init-loader {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  z-index: 9999;
+  
+  .brand-shell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    animation: authFadeIn 0.5s ease-out;
+  }
+
+  .brand-logo-pulse {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: logoPulse 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .brand-text {
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    color: #0B0F19;
+    text-align: center;
+
+    .text-accent {
+      color: #2563EB;
+    }
+  }
+
+  .status-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: #f8fafc;
+    border-radius: 100px;
+    border: 1px solid #f1f5f9;
+  }
+
+  .status-pulse {
+    width: 6px;
+    height: 6px;
+    background: #3b82f6;
+    border-radius: 50%;
+    animation: statusPulse 1.5s infinite;
+  }
+
+  .status-text {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748b;
+  }
+}
+
+@keyframes authFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 20px 40px -10px rgba(11, 15, 25, 0.2); }
+  50% { transform: scale(1.05); box-shadow: 0 25px 50px -12px rgba(11, 15, 25, 0.3); }
+}
+
+@keyframes statusPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}

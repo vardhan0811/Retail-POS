@@ -1,0 +1,36 @@
+﻿using Microsoft.EntityFrameworkCore;
+using ProductService.Entities;
+using System.Reflection.Emit;
+
+namespace ProductService.Data
+{
+    public class ProductDbContext : DbContext
+    {
+        public ProductDbContext(DbContextOptions<ProductDbContext> options)
+            : base(options)
+        {
+        }
+
+        public DbSet<Product> Products { get; set; }
+        public DbSet<Category> Categories { get; set; }
+        public DbSet<TaxConfiguration> Taxes { get; set; }
+        public DbSet<ProcessedMessage> ProcessedMessages { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Product>()
+                .HasIndex(p => new { p.Name, p.StoreId });
+
+            modelBuilder.Entity<Product>()
+                .HasIndex(p => p.SKU)
+                .IsUnique();
+
+            modelBuilder.Entity<Product>()
+                .HasOne(p => p.Tax)
+                .WithMany()
+                .HasForeignKey(p => p.TaxId);
+        }
+    }
+}

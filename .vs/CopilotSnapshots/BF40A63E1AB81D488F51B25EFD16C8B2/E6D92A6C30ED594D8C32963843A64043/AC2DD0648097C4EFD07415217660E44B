@@ -1,0 +1,31 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using NotificationService.Services;
+
+namespace NotificationService.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class OtpController : ControllerBase
+    {
+        private readonly OtpService _otpService;
+        public OtpController(OtpService otpService)
+        {
+            _otpService = otpService;
+        }
+
+        [HttpPost("send")]
+        public IActionResult SendOtp([FromQuery] string email)
+        {
+            var otp = _otpService.GenerateOtp(email);
+            _otpService.SendOtpEmail(email, otp);
+            return Ok("OTP sent to email.");
+        }
+
+        [HttpPost("verify")]
+        public IActionResult VerifyOtp([FromQuery] string email, [FromQuery] string otp)
+        {
+            var result = _otpService.VerifyOtp(email, otp);
+            return result ? Ok("OTP verified.") : BadRequest("Invalid or expired OTP.");
+        }
+    }
+}

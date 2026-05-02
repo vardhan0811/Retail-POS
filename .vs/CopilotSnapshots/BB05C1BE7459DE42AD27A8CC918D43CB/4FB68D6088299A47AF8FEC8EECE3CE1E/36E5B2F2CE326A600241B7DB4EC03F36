@@ -1,0 +1,24 @@
+﻿using System.ComponentModel.DataAnnotations;
+using BillingService.Entities;
+
+namespace BillingService.DTOs
+{
+    public class CreatePaymentRequest
+    {
+        [Required]
+        public Guid BillId { get; set; }
+
+        [Range(0.01, double.MaxValue)]
+        public decimal Amount { get; set; }
+
+        [Required]
+        [MaxLength(30)]
+        public string Method { get; set; } = string.Empty;
+
+        [Required]
+        public PaymentStatus Status { get; set; }
+
+        [MaxLength(100)]
+        public string? TransactionReference { get; set; }
+    }
+}

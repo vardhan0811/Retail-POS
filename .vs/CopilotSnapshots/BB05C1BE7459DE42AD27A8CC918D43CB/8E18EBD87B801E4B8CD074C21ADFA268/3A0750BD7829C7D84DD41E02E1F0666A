@@ -1,0 +1,85 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("api/admin/products")]
+    public class ProductController : ControllerBase
+    {
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _config;
+
+        public ProductController(IHttpClientFactory httpClientFactory, IConfiguration config)
+        {
+            _httpClientFactory = httpClientFactory;
+            _config = config;
+        }
+
+        [Authorize(Policy = "VIEW_REPORTS")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] Guid storeId)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            if (Request.Headers.ContainsKey("Authorization"))
+                client.DefaultRequestHeaders.Add("Authorization", Request.Headers["Authorization"].ToString());
+
+            var productServiceBaseUrl = _config["ServiceUrls:ProductService"] ?? "http://localhost:5002";
+            try
+            {
+                var response = await client.GetAsync($"{productServiceBaseUrl.TrimEnd('/')}/api/products?storeId={storeId}");
+                var content = await response.Content.ReadAsStringAsync();
+                return new ContentResult
+                {
+                    StatusCode = (int)response.StatusCode,
+                    ContentType = "application/json",
+                    Content = content
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, new { success = false, message = "ProductService unavailable" });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(503, new { success = false, message = "ProductService timeout" });
+            }
+        }
+
+        [Authorize(Policy = "VIEW_REPORTS")]
+        [HttpGet("low-stock")]
+        public async Task<IActionResult> GetLowStock([FromQuery] Guid storeId, [FromQuery] int threshold = 5)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            if (Request.Headers.ContainsKey("Authorization"))
+                client.DefaultRequestHeaders.Add("Authorization", Request.Headers["Authorization"].ToString());
+
+            var productServiceBaseUrl = _config["ServiceUrls:ProductService"] ?? "http://localhost:5002";
+            try
+            {
+                var response = await client.GetAsync($"{productServiceBaseUrl.TrimEnd('/')}/api/products/low-stock?storeId={storeId}&threshold={threshold}");
+                var content = await response.Content.ReadAsStringAsync();
+                return new ContentResult
+                {
+                    StatusCode = (int)response.StatusCode,
+                    ContentType = "application/json",
+                    Content = content
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, new { success = false, message = "ProductService unavailable" });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(503, new { success = false, message = "ProductService timeout" });
+            }
+        }
+    }
+}

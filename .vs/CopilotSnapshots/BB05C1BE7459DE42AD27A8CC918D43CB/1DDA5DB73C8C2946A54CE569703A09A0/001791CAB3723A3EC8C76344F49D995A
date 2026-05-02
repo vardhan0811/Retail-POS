@@ -1,0 +1,13 @@
+﻿namespace AuthService.DTOs
+{
+    public class RegisterRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+
+        //public Guid RoleId { get; set; } // If you want to assign a admin role during registration
+
+        public Guid StoreId { get; set; }
+    }
+}

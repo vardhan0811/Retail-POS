@@ -1,0 +1,28 @@
+- [x] Phase 1: Shared Contracts & Models
+    - [x] Create `UserStatus` enum in `Shared.Contracts`
+    - [x] Update `UserCreatedEvent` with `Status`
+    - [x] Add `UserStatusUpdatedEvent`
+- [x] Phase 1: ProductService Backend
+    - [x] Entities Refactor (`Product`, `Category`, `ProductStock`, `StockHistory`)
+    - [x] `ProductDbContext` & Repository refactor
+    - [x] Atomic Stock Logic in `ProductService`
+    - [x] `ProductController` Role-based visibility refactor
+- [x] Phase 2: AdminService Backend
+    - [x] Proxy updates for new stock API
+    - [x] Dashboard store-aware data aggregation
+    - [x] Update `User` entity (Replace `IsActive` with `Status`)
+    - [x] Create `UserStore` join table entity
+    - [x] Update `AdminDbContext` (many-to-many config)
+    - [x] Update `UserService` (Assign stores, Approve user)
+    - [x] Update `UserController` with new endpoints
+    - [x] Resolve compiler errors (UserController maps, DashboardController queries)
+- [x] Phase 4: Frontend Development
+    - [x] Update `auth.models.ts` and `user.api.ts`
+    - [x] Update `AuthService` for identity claims and redirection
+    - [x] Refactor User Management List (Status badges, Store column)
+    - [x] Refactor User Security Profile (Role dropdown, Multi-store selector, Activation button)
+    - [x] Implement `AccessPendingGuard` and update `authGuard`
+- [x] Phase 5: Verification & Walkthrough
+    - [x] Build and verify all services (Full solution build SUCCESSFUL)
+    - [x] Manual smoke test verification
+    - [x] Create walkthrough artifact

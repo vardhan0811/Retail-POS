@@ -1,0 +1,48 @@
+<div class="login-container">
+	<div class="login-wrapper">
+		<div class="login-card">
+			<div class="login-header">
+				<h1>Retail POS</h1>
+				<p>Sign in to continue</p>
+			</div>
+
+			<form (ngSubmit)="submit()" [formGroup]="form" class="login-form" novalidate>
+				<div class="form-group">
+					<label for="email">Email</label>
+					<input id="email" type="email" formControlName="email" placeholder="name@company.com"
+						autocomplete="username" />
+					<p *ngIf="form.controls.email.touched && form.controls.email.invalid" class="validation-error">
+						Please enter a valid email.
+					</p>
+				</div>
+
+				<div class="form-group">
+					<label for="password">Password</label>
+					<input id="password" type="password" formControlName="password" placeholder="••••••••"
+						autocomplete="current-password" />
+					<p *ngIf="form.controls.password.touched && form.controls.password.invalid"
+						class="validation-error">
+						Password is required.
+					</p>
+				</div>
+
+				<div class="space-y-1">
+					<input type="text" [(ngModel)]="username" name="username" [ngModelOptions]="{ standalone: true }"
+						placeholder="Enter username" class="w-full px-5 py-5 border rounded" />
+				</div>
+
+
+				<div *ngIf="errorMessage" class="error-message">
+					{{ errorMessage }}
+				</div>
+
+				<button type="submit" [disabled]="isSubmitting" class="btn-submit">
+					<span *ngIf="!isSubmitting">Sign in</span>
+					<span *ngIf="isSubmitting">Signing in…</span>
+				</button>
+
+				<p class="role-notice">Your access is role-based: Admin or Cashier.</p>
+			</form>
+		</div>
+	</div>
+</div>

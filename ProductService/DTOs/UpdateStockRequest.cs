@@ -1,0 +1,11 @@
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace ProductService.DTOs
+{
+    public class UpdateStockRequest
+    {
+        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "Quantity must be greater than 0")]
+        public int Quantity { get; set; }
+    }
+}

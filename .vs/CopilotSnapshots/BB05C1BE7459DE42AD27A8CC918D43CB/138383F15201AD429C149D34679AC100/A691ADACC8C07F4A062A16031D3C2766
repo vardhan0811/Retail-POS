@@ -1,0 +1,120 @@
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using ProductService.Data;
+using ProductService.Entities;
+using Shared.Contracts.Events;
+using Shared.Messaging.RabbitMq;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ProductService.Services
+{
+    public sealed class RabbitMqConsumerHostedService : Shared.Messaging.RabbitMq.RabbitMqConsumerBase
+    {
+        private readonly IServiceScopeFactory _scopeFactory;
+
+        public RabbitMqConsumerHostedService(
+            IConfiguration config,
+            ILogger<RabbitMqConsumerHostedService> logger,
+            IServiceScopeFactory scopeFactory)
+            : base(config, logger, queueName: "product.bill.created", routingKeys: "bill.created")
+        {
+            _scopeFactory = scopeFactory;
+        }
+
+
+        protected override async Task ProcessMessageAsync(byte[] body, string routingKey, CancellationToken ct)
+        {
+
+            //throw new InvalidOperationException("DLQ demo: forcing failure"); // DLQ demo: force failure to show retry and DLQ in action. Remove this line in production.
+
+            var json = Encoding.UTF8.GetString(body);
+
+            var billEvent = JsonSerializer.Deserialize<BillCreatedEvent>(
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? throw new InvalidOperationException("Failed to deserialize BillCreatedEvent.");
+
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
+            var publisher = scope.ServiceProvider.GetRequiredService<Shared.Messaging.RabbitMq.RabbitMqPublisherBase>();
+
+            // Idempotency: use MessageId (not BillId)
+            var alreadyProcessed = await db.ProcessedMessages.AnyAsync(pm => pm.MessageId == billEvent.MessageId, ct);
+            if (alreadyProcessed)
+                return;
+
+            var productIds = billEvent.Items.Select(i => i.ProductId).Distinct().ToList();
+            var products = await db.Products
+                .Where(p => productIds.Contains(p.Id) && p.IsActive)
+                .ToDictionaryAsync(p => p.Id, ct);
+
+            foreach (var item in billEvent.Items)
+            {
+                if (!products.TryGetValue(item.ProductId, out var product))
+                {
+                    publisher.Publish(new StockFailedEvent
+                    {
+                        MessageId = Guid.NewGuid(),
+                        CorrelationId = billEvent.CorrelationId,
+                        BillId = billEvent.BillId,
+                        Reason = "Product not found"
+                    }, "stock.failed");
+
+                    db.ProcessedMessages.Add(new ProcessedMessage
+                    {
+                        Id = Guid.NewGuid(),
+                        MessageId = billEvent.MessageId,
+                        ProcessedAt = DateTime.UtcNow
+                    });
+                    await db.SaveChangesAsync(ct);
+                    return;
+                }
+
+                if (product == null || product.Stock < item.Quantity)
+                {
+                    publisher.Publish(new StockFailedEvent
+                    {
+                        MessageId = Guid.NewGuid(),
+                        CorrelationId = billEvent.CorrelationId,
+                        BillId = billEvent.BillId,
+                        Reason = "Insufficient stock"
+                    }, "stock.failed");
+
+                    db.ProcessedMessages.Add(new ProcessedMessage
+                    {
+                        Id = Guid.NewGuid(),
+                        MessageId = billEvent.MessageId,
+                        ProcessedAt = DateTime.UtcNow
+                    });
+                    await db.SaveChangesAsync(ct);
+                    return;
+                }
+
+                product.Stock -= item.Quantity;
+            }
+
+            db.ProcessedMessages.Add(new ProcessedMessage
+            {
+                Id = Guid.NewGuid(),
+                MessageId = billEvent.MessageId,
+                ProcessedAt = DateTime.UtcNow
+            });
+
+            await db.SaveChangesAsync(ct);
+
+            publisher.Publish(new StockReservedEvent
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = billEvent.CorrelationId,
+                BillId = billEvent.BillId
+            }, "stock.reserved");
+        }
+    }
+}

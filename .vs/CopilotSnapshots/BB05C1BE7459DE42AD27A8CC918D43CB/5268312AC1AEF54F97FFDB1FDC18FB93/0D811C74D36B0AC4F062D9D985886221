@@ -1,0 +1,92 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ProductService.Entities;
+using ProductService.Services;
+using ProductService.DTOs;
+using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+
+namespace ProductService.Controllers
+{
+    [ApiController]
+    [Route("api/products/categories")]
+    [Authorize]
+    public class CategoryController : ControllerBase
+    {
+        private readonly ICategoryService _categoryService;
+        public CategoryController(ICategoryService categoryService)
+        {
+            _categoryService = categoryService;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] Guid storeId)
+        {
+            var categories = await _categoryService.GetAllAsync(storeId);
+            return Ok(new ApiResponse<IEnumerable<Category>>
+            {
+                Message = "Categories fetched successfully",
+                Success = true,
+                Data = categories
+            });
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var category = await _categoryService.GetByIdAsync(id);
+            if (category == null)
+                return NotFound(new ApiResponse<object> { Message = "Category not found", Success = false });
+            return Ok(new ApiResponse<Category>
+            {
+                Message = "Category fetched successfully",
+                Success = true,
+                Data = category
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_CATEGORY")]
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] Category category)
+        {
+            var created = await _categoryService.CreateAsync(category);
+            return Ok(new ApiResponse<Category>
+            {
+                Message = "Category created successfully",
+                Success = true,
+                Data = created
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_CATEGORY")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] Category update)
+        {
+            var updated = await _categoryService.UpdateAsync(id, update);
+            if (updated == null)
+                return NotFound(new ApiResponse<object> { Message = "Category not found", Success = false });
+            return Ok(new ApiResponse<Category>
+            {
+                Message = "Category updated successfully",
+                Success = true,
+                Data = updated
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_CATEGORY")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var deleted = await _categoryService.DeleteAsync(id);
+            if (!deleted)
+                return NotFound(new ApiResponse<object> { Message = "Category not found", Success = false });
+            return Ok(new ApiResponse<object>
+            {
+                Message = "Category deleted successfully",
+                Success = true,
+                Data = null
+            });
+        }
+    }
+}

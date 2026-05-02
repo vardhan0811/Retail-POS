@@ -1,0 +1,16 @@
+﻿using ProductService.Entities;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace ProductService.Services
+{
+    public interface ICategoryService
+    {
+        Task<IEnumerable<Category>> GetAllAsync(Guid storeId);
+        Task<Category?> GetByIdAsync(Guid id);
+        Task<Category> CreateAsync(Category category);
+        Task<Category?> UpdateAsync(Guid id, Category update);
+        Task<bool> DeleteAsync(Guid id);
+    }
+}

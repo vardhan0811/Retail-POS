@@ -1,0 +1,158 @@
+﻿using AuthService.Authorization;
+using AuthService.Data;
+using AuthService.Middleware;
+using AuthService.Repositories;
+using AuthService.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
+
+namespace AuthService
+{
+    public class Program
+    {
+        public static async Task Main(string[] args) // async needed for seeding
+        {
+            var builder = WebApplication.CreateBuilder(args);
+            builder.Services.AddMemoryCache(); // Register IMemoryCache for temporary registration storage
+
+            // Database context with SQL Server (connection string from appsettings.json)
+            builder.Services.AddDbContext<AuthDbContext>(options =>
+                options.UseSqlServer(
+                    builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            // JWT AUTH
+            var jwtKey = builder.Configuration["Jwt:Key"];
+            var issuer = builder.Configuration["Jwt:Issuer"];
+            var audience = builder.Configuration["Jwt:Audience"];
+
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = issuer,
+
+                        ValidateAudience = true,
+                        ValidAudience = audience,
+
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(jwtKey))
+                    };
+                });
+
+            // Authorization policies based on permissions
+            builder.Services.AddAuthorization(options =>
+            {
+                options.AddPolicy("CREATE_BILL",
+                    policy => policy.Requirements.Add(
+                        new PermissionRequirement("CREATE_BILL")));
+
+                options.AddPolicy("VIEW_PRODUCT",
+                    policy => policy.Requirements.Add(
+                        new PermissionRequirement("VIEW_PRODUCT")));
+
+                options.AddPolicy("APPROVE_RETURN",
+                    policy => policy.Requirements.Add(
+                        new PermissionRequirement("APPROVE_RETURN")));
+
+                options.AddPolicy("UPDATE_PRODUCT",
+                    policy => policy.Requirements.Add(
+                        new PermissionRequirement("UPDATE_PRODUCT")));
+            });
+
+
+            // Dependency Injection for Repositories and Services
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<IAuthService, AuthServices>();
+            builder.Services.AddScoped<IJwtService, JwtService>();
+            // Register NotificationClient with HttpClient for NotificationService
+            builder.Services.AddHttpClient<NotificationClient>(client =>
+            {
+                client.BaseAddress = new Uri("http://localhost:5005"); // Change to your NotificationService URL/port
+            });
+
+            // Authorization handler (singleton because stateless)
+            builder.Services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+            builder.Services.AddSingleton<RabbitMqPublisher>();
+            builder.Services.AddScoped<RegistrationCacheService>();
+            builder.Services.AddScoped<RefreshTokenService>();
+            builder.Services.AddHostedService<RabbitMqUserCreatedConsumer>();
+
+            // Controllers + Swagger
+            builder.Services.AddControllers();
+            builder.Services.AddEndpointsApiExplorer();
+
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Enter 'Bearer <your-token>'"
+                });
+
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        new string[] {}
+                    }
+                });
+            });
+
+
+            var app = builder.Build();
+
+            
+
+            // Database Seeding on startup
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+
+                // Ensure DB is created 
+                await db.Database.MigrateAsync();
+
+                // Seed initial data (roles, permissions, admin user)
+                await DbSeeder.SeedAsync(db);
+            }
+
+            // Middleware pipeline
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
+
+            app.UseHttpsRedirection();
+
+            // Global Exception Handling Middleware
+            app.UseMiddleware<ExceptionMiddleware>();
+
+            app.UseAuthentication();  // who are you?
+            app.UseAuthorization();   // what can you do?
+
+            app.MapControllers();
+
+            app.Run();
+        }
+    }
+}

@@ -1,0 +1,7 @@
+﻿namespace BillingService.Events
+{
+    public class StockReservedEvent
+    {
+        public Guid BillId {  get; set; }
+    }
+}

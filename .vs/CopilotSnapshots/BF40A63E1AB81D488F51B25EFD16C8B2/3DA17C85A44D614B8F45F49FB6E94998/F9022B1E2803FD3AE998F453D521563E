@@ -1,0 +1,45 @@
+﻿using System.Net;
+using System.Text.Json;
+
+namespace AuthService.Middleware
+{
+    public class ExceptionMiddleware
+    {
+        private readonly RequestDelegate _next;
+
+        public ExceptionMiddleware(RequestDelegate next)
+        {
+            _next = next;
+        }
+
+        public async Task InvokeAsync(HttpContext context)
+        {
+            try
+            {
+                await _next(context);
+            }
+            catch (Exception ex)
+            {
+                int statusCode = (int)HttpStatusCode.BadRequest;
+                string message = ex.Message;
+
+                if (ex is CustomExceptions.NotFoundException)
+                    statusCode = (int)HttpStatusCode.NotFound;
+                else if (ex is CustomExceptions.BusinessException)
+                    statusCode = (int)HttpStatusCode.BadRequest;
+                else
+                    statusCode = (int)HttpStatusCode.InternalServerError;
+
+                context.Response.StatusCode = statusCode;
+                context.Response.ContentType = "application/json";
+
+                var result = JsonSerializer.Serialize(new
+                {
+                    error = message
+                });
+
+                await context.Response.WriteAsync(result);
+            }
+        }
+    }
+}

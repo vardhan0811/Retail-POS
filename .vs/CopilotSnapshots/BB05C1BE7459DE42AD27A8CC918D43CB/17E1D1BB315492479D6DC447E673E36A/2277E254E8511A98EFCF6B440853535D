@@ -1,0 +1,187 @@
+﻿using BillingService.Data;
+using BillingService.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace BillingService.Repositories
+{
+    public class BillingRepository : IBillingRepository
+    {
+        private readonly BillingDbContext _context;
+
+        public BillingRepository(BillingDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task AddAsync(Bill bill)
+        {
+            await _context.Bills.AddAsync(bill);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<Bill?> GetByIdAsync(Guid id)
+        {
+            return await _context.Bills.Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == id);
+        }
+
+        public async Task<IEnumerable<Bill>> GetAllAsync()
+        {
+            return await _context.Bills.Include(b => b.Items).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Bill>> GetByStatusAsync(string status)
+        {
+            if (!Enum.TryParse<BillStatus>(status, true, out var parsedStatus))
+                return Enumerable.Empty<Bill>();
+
+            return await _context.Bills.Include(b => b.Items).Where(b => b.Status == parsedStatus).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Bill>> GetByUserAsync(Guid userId)
+        {
+            return await _context.Bills.Include(b => b.Items).Where(b => b.UserId == userId).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Bill>> GetByDateRangeAsync(DateTime start, DateTime end)
+        {
+            return await _context.Bills.Include(b => b.Items).Where(b => b.CreatedAt >= start && b.CreatedAt <= end).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Bill>> GetTodayAsync()
+        {
+            var today = DateTime.UtcNow.Date;
+            return await _context.Bills.Include(b => b.Items).Where(b => b.CreatedAt.Date == today).ToListAsync();
+        }
+
+        public async Task<decimal> GetTotalRevenueAsync()
+        {
+            return await _context.Bills
+                .Where(b => b.Status == BillStatus.Finalized || b.Status == BillStatus.Confirmed)
+                .SumAsync(b => b.FinalAmount);
+        }
+
+
+        public async Task UpdateAsync(Bill bill)
+        {
+            _context.Bills.Update(bill);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<IEnumerable<Bill>> GetByStoreAsync(Guid storeId)
+        {
+            return await _context.Bills.Include(b => b.Items).Where(b => b.StoreId == storeId).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Bill>> GetByUserDateRangeAsync(Guid userId, DateTime start, DateTime end)
+        {
+            return await _context.Bills.Include(b => b.Items).Where(b => b.UserId == userId && b.CreatedAt >= start && b.CreatedAt <= end).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Bill>> GetByStoreDateRangeAsync(Guid storeId, DateTime start, DateTime end)
+        {
+            return await _context.Bills.Include(b => b.Items).Where(b => b.StoreId == storeId && b.CreatedAt >= start && b.CreatedAt <= end).ToListAsync();
+        }
+
+        public async Task<Bill?> GetByNumberAsync(string billNumber)
+        {
+            return await _context.Bills
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id.ToString() == billNumber);
+        }
+
+        public async Task<IEnumerable<Bill>> SearchAsync(string numberOrReference)
+        {
+            return await _context.Bills.Include(b => b.Items)
+                .Where(b => b.Id.ToString().Contains(numberOrReference) || b.Items.Any(i => i.ProductName.Contains(numberOrReference)))
+                .ToListAsync();
+        }
+
+        public async Task<decimal> GetStoreRevenueAsync(Guid storeId)
+        {
+            return await _context.Bills
+                .Where(b => b.StoreId == storeId && (b.Status == BillStatus.Finalized || b.Status == BillStatus.Confirmed))
+                .SumAsync(b => b.FinalAmount);
+        }
+
+
+        public async Task<IEnumerable<object>> GetTopCustomersAsync(Guid storeId, int count)
+        {
+            return await _context.Bills
+                .Where(b => b.StoreId == storeId)
+                .GroupBy(b => b.UserId)
+                .Select(g => new { UserId = g.Key, Total = g.Sum(b => b.FinalAmount) })
+                .OrderByDescending(x => x.Total)
+                .Take(count)
+                .ToListAsync<object>();
+        }
+
+        public async Task<IEnumerable<object>> GetTopProductsAsync(Guid storeId, int count)
+        {
+            return await _context.Bills
+                .Where(b => b.StoreId == storeId)
+                .SelectMany(b => b.Items)
+                .GroupBy(i => i.ProductId)
+                .Select(g => new { ProductId = g.Key, TotalQty = g.Sum(i => i.Quantity) })
+                .OrderByDescending(x => x.TotalQty)
+                .Take(count)
+                .ToListAsync<object>();
+        }
+
+        public async Task RefundAsync(Guid billId)
+        {
+            var bill = await _context.Bills.FirstOrDefaultAsync(b => b.Id == billId);
+            if (bill != null)
+            {
+                bill.Status = BillStatus.Refunded;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+       
+
+        public async Task<(IEnumerable<Bill>, int)> GetPagedAsync(int page, int pageSize, string? status, Guid? userId, Guid? storeId, DateTime? start, DateTime? end, string? sortBy)
+        {
+            var query = _context.Bills.Include(b => b.Items).AsQueryable();
+            if (!string.IsNullOrEmpty(status))
+            {
+                if (Enum.TryParse<BillStatus>(status, true, out var parsedStatus))
+                    query = query.Where(b => b.Status == parsedStatus);
+                else
+                    query = query.Where(_ => false);
+            }
+            if (userId.HasValue)
+                query = query.Where(b => b.UserId == userId);
+            if (storeId.HasValue)
+                query = query.Where(b => b.StoreId == storeId);
+            if (start.HasValue)
+                query = query.Where(b => b.CreatedAt >= start.Value);
+            if (end.HasValue)
+                query = query.Where(b => b.CreatedAt <= end.Value);
+            if (!string.IsNullOrEmpty(sortBy))
+            {
+                query = sortBy switch
+                {
+                    "amount_desc" => query.OrderByDescending(b => b.FinalAmount),
+                    "amount_asc" => query.OrderBy(b => b.FinalAmount),
+                    "date_desc" => query.OrderByDescending(b => b.CreatedAt),
+                    "date_asc" => query.OrderBy(b => b.CreatedAt),
+                    _ => query.OrderByDescending(b => b.CreatedAt)
+                };
+            }
+            var total = await query.CountAsync();
+            var bills = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            return (bills, total);
+        }
+
+        public async Task<string> ExportCsvAsync()
+        {
+            var bills = await _context.Bills.Include(b => b.Items).ToListAsync();
+            var csv = "BillId,StoreId,UserId,TotalAmount,TaxAmount,FinalAmount,CreatedAt,Status\n";
+            foreach (var b in bills)
+            {
+                csv += $"{b.Id},{b.StoreId},{b.UserId},{b.TotalAmount},{b.TaxAmount},{b.FinalAmount},{b.CreatedAt},{b.Status}\n";
+            }
+            return csv;
+        }
+    }
+}

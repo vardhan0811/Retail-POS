@@ -1,0 +1,13 @@
+﻿{
+    "EmailSettings": {
+        "FromEmail": "rayapureddyvardhan2004@gmail.com",
+        "AppPassword": "idsruieobjaoygpa"
+    },
+    "Jwt": {
+        "Key": "THIS_IS_SUPER_SECRET_KEY_1234567890"
+    },
+    "ConnectionStrings": {
+        "DefaultConnection": "Server=.\\SQLEXPRESS;Database=RetailPOS_NotificationService;Trusted_Connection=True;TrustServerCertificate=True"
+    }
+}
+

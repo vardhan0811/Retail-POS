@@ -1,0 +1,34 @@
+﻿using AdminService.DTOs;
+using AdminService.Entities;
+using AdminService.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("admin/[controller]")]
+    public class StoreController : ControllerBase
+    {
+        private readonly AdminDbContext _db;
+        public StoreController(AdminDbContext db) { _db = db; }
+
+        
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpGet]
+        public async Task<IActionResult> GetAllStores()
+        {
+            var stores = await _db.Stores.ToListAsync();
+            return Ok(new ApiResponse<List<Store>>
+            {
+                Success = true,
+                Message = "Stores fetched successfully",
+                Data = stores
+            });
+        }
+    }
+}

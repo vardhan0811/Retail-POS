@@ -1,0 +1,72 @@
+﻿using AdminService.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using AdminService.DTOs;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("admin/[controller]")]
+    public class UserController : ControllerBase
+    {
+        private readonly IUserService _service;
+        public UserController(IUserService service) { _service = service; }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var users = await _service.GetAllAsync();
+            var result = users.Select(u => new UserDto
+            {
+                Id = u.Id,
+                UserName = u.UserName,
+                Email = u.Email,
+                Role = u.Role,
+                IsActive = u.IsActive,
+                StoreId = u.StoreId
+            }).ToList();
+
+            return Ok(new ApiResponse<IEnumerable<UserDto>>
+            {
+                Success = true,
+                Message = "Users fetched successfully",
+                Data = result
+            });
+        }
+
+        [Authorize(Policy = "MANAGE_USERS")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var user = await _service.GetByIdAsync(id);
+            if (user == null)
+                return NotFound(new ApiResponse<UserDto>
+                {
+                    Success = false,
+                    Message = "User not found",
+                    Data = null
+                });
+
+            var dto = new UserDto
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+                Role = user.Role,
+                IsActive = user.IsActive,
+                StoreId = user.StoreId
+            };
+
+            return Ok(new ApiResponse<UserDto>
+            {
+                Success = true,
+                Message = "User fetched successfully",
+                Data = dto
+            });
+        }
+    }
+}

@@ -1,0 +1,173 @@
+﻿using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace ProductService.Migrations
+{
+    /// <inheritdoc />
+    public partial class ProductService_DomainHardeningAndSales : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropIndex(
+                name: "IX_Products_SKU",
+                table: "Products");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Barcode",
+                table: "Products",
+                type: "nvarchar(450)",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(max)");
+
+            migrationBuilder.AddColumn<byte[]>(
+                name: "RowVersion",
+                table: "Products",
+                type: "rowversion",
+                rowVersion: true,
+                nullable: false,
+                defaultValue: new byte[0]);
+
+            migrationBuilder.AddColumn<int>(
+                name: "TotalSoldQuantity",
+                table: "Products",
+                type: "int",
+                nullable: false,
+                defaultValue: 0);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Name",
+                table: "Categories",
+                type: "nvarchar(450)",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(max)");
+
+            migrationBuilder.AddColumn<bool>(
+                name: "IsActive",
+                table: "Categories",
+                type: "bit",
+                nullable: false,
+                defaultValue: true);
+
+            // Backfill missing categories referenced by existing products before adding FK.
+            migrationBuilder.Sql(@"
+                INSERT INTO [Categories] ([Id], [Name], [StoreId], [IsActive])
+                SELECT p.[CategoryId], CONCAT('Migrated-', CONVERT(varchar(36), p.[CategoryId])), MIN(p.[StoreId]), 1
+                FROM [Products] p
+                LEFT JOIN [Categories] c ON c.[Id] = p.[CategoryId]
+                WHERE c.[Id] IS NULL
+                GROUP BY p.[CategoryId];
+            ");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Products_Barcode",
+                table: "Products",
+                column: "Barcode");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Products_CategoryId",
+                table: "Products",
+                column: "CategoryId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Products_SKU_StoreId",
+                table: "Products",
+                columns: new[] { "SKU", "StoreId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Products_StoreId",
+                table: "Products",
+                column: "StoreId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProcessedMessages_MessageId",
+                table: "ProcessedMessages",
+                column: "MessageId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Categories_Name_StoreId",
+                table: "Categories",
+                columns: new[] { "Name", "StoreId" },
+                unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_Products_Categories_CategoryId",
+                table: "Products",
+                column: "CategoryId",
+                principalTable: "Categories",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropForeignKey(
+                name: "FK_Products_Categories_CategoryId",
+                table: "Products");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Products_Barcode",
+                table: "Products");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Products_CategoryId",
+                table: "Products");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Products_SKU_StoreId",
+                table: "Products");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Products_StoreId",
+                table: "Products");
+
+            migrationBuilder.DropIndex(
+                name: "IX_ProcessedMessages_MessageId",
+                table: "ProcessedMessages");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Categories_Name_StoreId",
+                table: "Categories");
+
+            migrationBuilder.DropColumn(
+                name: "RowVersion",
+                table: "Products");
+
+            migrationBuilder.DropColumn(
+                name: "TotalSoldQuantity",
+                table: "Products");
+
+            migrationBuilder.DropColumn(
+                name: "IsActive",
+                table: "Categories");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Barcode",
+                table: "Products",
+                type: "nvarchar(max)",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(450)");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Name",
+                table: "Categories",
+                type: "nvarchar(max)",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(450)");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Products_SKU",
+                table: "Products",
+                column: "SKU",
+                unique: true);
+        }
+    }
+}

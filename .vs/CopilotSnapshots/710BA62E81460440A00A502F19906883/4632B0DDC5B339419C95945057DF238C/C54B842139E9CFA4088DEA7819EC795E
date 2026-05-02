@@ -1,0 +1,63 @@
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddMemoryCache(); // For OTP storage
+builder.Services.AddScoped<NotificationService.Services.OtpService>();
+builder.Services.Configure<NotificationService.Services.EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+
+// Register RabbitMQ publisher and consumer (config-driven)
+builder.Services.AddSingleton<NotificationService.Services.RabbitMqPublisherBase, NotificationService.Services.RabbitMqPublisher>();
+builder.Services.AddHostedService<NotificationService.Services.RabbitMqConsumerHostedService>();
+
+// JWT AUTH
+var jwtKey = builder.Configuration["Jwt:Key"];
+var issuer = builder.Configuration["Jwt:Issuer"];
+var audience = builder.Configuration["Jwt:Audience"];
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+
+            ValidateAudience = true,
+            ValidAudience = audience,
+
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+
+// Register global exception middleware
+app.UseMiddleware<NotificationService.Middleware.ExceptionMiddleware>();
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+app.Run();

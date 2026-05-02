@@ -112,7 +112,11 @@ namespace AuthService
             builder.Services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
             builder.Services.AddSingleton<RabbitMqPublisherBase>();
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .ConfigureApiBehaviorOptions(options =>
+                {
+                    options.SuppressModelStateInvalidFilter = true;
+                });
             builder.Services.AddEndpointsApiExplorer();
 
             builder.Services.AddSwaggerGen(options =>

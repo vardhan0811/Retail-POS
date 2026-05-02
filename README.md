@@ -1,85 +1,442 @@
-# Retail POS & Billing Management System
+# RetailPOS — Enterprise Billing & Store Management System
 
-Retail POS & Billing Management System is a production-grade, microservices-oriented Retail Point of Sale and Store Management system. It is designed for high-performance retail environments, offering a seamless operator experience with robust backend data integrity.
-
-## 🚀 Key Features
-
-### 🛒 High-Fidelity POS Terminal
-- **Keyboard-First UX**: Rapid scanning with auto-focus search, `Enter-to-Add`, and contextual shortcuts (`+`/`-`/`Ctrl+Enter`).
-- **Real-Time Inventory**: Automatic stock validation during cart updates with "Low Stock" and "Out of Stock" visual alerts.
-- **Hold & Resume**: Pause complex transactions to serve other customers and resume them later from any terminal.
-- **Price Breakdown**: Automated tax (GST) calculation and professional financial summaries.
-
-### 📊 Operator Dashboard
-- **Live Revenue Tracking**: Real-time sales aggregation for today's session.
-- **Actionable History**: Visual billing log with status-coded badges (Awaiting Payment, Completed, Refunded, Void).
-- **Advanced Filtering**: Ultra-fast search by Bill #, Amount, or Date.
-
-### 🛡️ Secure Backend (Microservices)
-- **Distributed Architecture**: Modular services for Auth, Products, Billing, and Administration.
-- **Event-Driven Inventory**: RabbitMQ integration ensuring stock consistency across services.
-- **API Gateway**: Ocelot-based routing with JWT authentication and role-based access control.
-- **Audit Logging**: Comprehensive event logging (Serilog) for critical transactions and stock movements.
-
-### 🖨️ Professional Receipts
-- **POS Ready**: Thermal-printer optimized receipt layouts (80mm).
-- **Digital Downloads**: Instant PDF generation for digital sharing.
-- **Ownership Validation**: Secured receipt endpoints ensuring privacy and data isolation.
-
-## 🛠️ Tech Stack
-
-| Layer | Technologies |
-| :--- | :--- |
-| **Backend** | .NET 9, ASP.NET Core, EF Core, SQL Server |
-| **Messaging** | RabbitMQ (MassTransit) |
-| **Gateway** | Ocelot API Gateway |
-| **Frontend** | Angular 21, Tailwind CSS, RxJS, Angular Material |
-| **Logging** | Serilog (File & Console) |
-
-## 📁 Project Structure
-
-```text
-├── ApiGateway/          # Ocelot Gateway (Entry point: 5000)
-├── AuthService/         # Identity & JWT Management
-├── ProductService/      # Product Catalog & Inventory
-├── BillingService/      # Order Processing & Lifecycle
-├── AdminService/        # Analytics & Admin Tools
-├── NotificationService/ # Async Messaging & Notifications
-├── Shared.Contracts/    # Cross-service DTOs and Interfaces
-├── Shared.Messaging/    # RabbitMQ Event Definitions
-└── pos-frontend/        # Angular 21 SPA (Tailwind CSS)
-```
-
-## 🏁 Getting Started
-
-### Prerequisites
-- .NET 9 SDK
-- Node.js (v20+)
-- SQL Server (or LocalDB)
-- RabbitMQ (Docker or Local)
-
-### Backend Setup
-1. Open `RetailPOS.sln` in Visual Studio or VS Code.
-2. Update connection strings in `appsettings.json` for each service.
-3. Start the services (ordered): `Auth` -> `Product` -> `Billing` -> `Admin` -> `ApiGateway`.
-
-### Frontend Setup
-1. Navigate to `pos-frontend`.
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm start
-   ```
-4. Access the POS at `http://localhost:4200`.
-
-## ⚙️ Operational Flow
-1. **Login**: Authenticated as Cashier or Admin.
-2. **Sale**: Add items to cart -> Checkout -> Select Payment (Cash/Card).
-3. **Fulfillment**: Stock is automatically deducted via RabbitMQ events upon bill finalization.
-4. **Refund**: Cashier initiates request -> Admin approves via Dashboard -> Stock is restored.
+> A modern, distributed, real-time Retail POS + Admin Control System built using Angular + .NET Microservices.
 
 ---
-*Created by Antigravity for Production Retail Environments.*
+
+## 🌟 Overview
+
+**RetailPOS** is a full-stack enterprise-grade retail management platform designed for:
+
+* ⚡ High-speed billing (POS terminal)
+* 🧠 Centralized admin intelligence
+* 🏬 Multi-store management
+* 🔐 Secure role-based access
+* 📊 Real-time analytics
+
+It separates **Operational Flow (POS)** and **Control Flow (Admin)** — just like real-world enterprise systems.
+
+---
+
+## 📸 Screenshots
+
+---
+
+### 🔹 1. Landing Pages
+
+`/docs/screenshots/landing.png`
+![Landing](docs/screenshots/landing.png)
+
+`/docs/screenshots/landing2.png`
+![Landing](docs/screenshots/landing2.png)
+
+`/docs/screenshots/landing3.png`
+![Landing](docs/screenshots/landing3.png)
+
+`/docs/screenshots/landing4.png`
+![Landing](docs/screenshots/landing4.png)
+
+---
+
+### 🔹 2. Authentication
+
+`/docs/screenshots/login.png`
+![Login](docs/screenshots/login.png)
+
+---
+
+### 🔹 3. Admin Dashboard & Setup
+
+`/docs/screenshots/admin-dashboard.png`
+![Admin Dashboard](docs/screenshots/admin-dashboard.png)
+
+`/docs/screenshots/admin-catalog.png`
+![Catalog](docs/screenshots/admin-catalog.png)
+
+`/docs/screenshots/admin-inventory.png`
+![Inventory](docs/screenshots/admin-inventory.png)
+
+---
+
+### 🔹 4. User & Access Control
+
+`/docs/screenshots/new-user-approval.png`
+![New User Approval](docs/screenshots/new-user-approval.png)
+
+`/docs/screenshots/admin-approval.png`
+![Admin Approval](docs/screenshots/admin-approval.png)
+
+`/docs/screenshots/assign-role-by-admin.png`
+![Assign Role](docs/screenshots/assign-role-by-admin.png)
+
+`/docs/screenshots/admin-users.png`
+![Users](docs/screenshots/admin-users.png)
+
+---
+
+### 🔹 5. POS Billing Flow (End-to-End)
+
+#### 🖥 Step 1: POS Terminal (Add Products)
+
+`/docs/screenshots/pos-terminal.png`
+![POS Terminal](docs/screenshots/pos-terminal.png)
+
+#### 💳 Step 2: Payment Processing
+
+`/docs/screenshots/payment.png`
+![Payment](docs/screenshots/payment.png)
+
+#### ✅ Step 3: Transaction Finalized
+
+`/docs/screenshots/transaction-finalized.png`
+![Transaction Finalized](docs/screenshots/transaction-finalized.png)
+
+#### 🔍 Step 4: Transaction Details
+
+`/docs/screenshots/transaction-detail.png`
+![Transaction Detail](docs/screenshots/transaction-detail.png)
+
+#### 🧾 Step 5: Bills Overview
+
+`/docs/screenshots/bills.png`
+![Bills](docs/screenshots/bills.png)
+
+#### 🖨 Step 6: Bill Print
+
+`/docs/screenshots/bill-print.png`
+![Bill Print](docs/screenshots/bill-print.png)
+
+#### ⬇ Step 7: Bill Download
+
+`/docs/screenshots/bill-download.png`
+![Bill Download](docs/screenshots/bill-download.png)
+
+#### 📧 Step 8: Invoice Email Sent
+
+`/docs/screenshots/mail-sent.png`
+![Mail Sent](docs/screenshots/mail-sent.png)
+
+---
+
+### 🔹 6. Invoice Management
+
+`/docs/screenshots/invoice-print.png`
+![Invoice Print](docs/screenshots/invoice-print.png)
+
+`/docs/screenshots/invoice-download.png`
+![Invoice Download](docs/screenshots/invoice-download.png)
+
+`/docs/screenshots/invoice-email.png`
+![Invoice Email](docs/screenshots/invoice-email.png)
+
+---
+
+### 🔹 7. Refund Workflow
+
+#### 🔄 Step 1: Initiate Refund
+
+`/docs/screenshots/initiate-refund.png`
+![Initiate Refund](docs/screenshots/initiate-refund.png)
+
+#### 📥 Step 2: Approve Refund
+
+`/docs/screenshots/approve-refund.png`
+![Approve Refund](docs/screenshots/approve-refund.png)
+
+#### ✔ Step 3: Refund Settled
+
+`/docs/screenshots/settled-refund.png`
+![Settled Refund](docs/screenshots/settled-refund.png)
+
+#### 📄 Step 4: Refund Receipt
+
+`/docs/screenshots/refund-receipt.png`
+![Refund Receipt](docs/screenshots/refund-receipt.png)
+
+#### 💸 Refunded Bills
+
+`/docs/screenshots/bills-refunded.png`
+![Refunded Bills](docs/screenshots/bills-refunded.png)
+
+---
+
+### 🔹 8. Reports & Monitoring
+
+`/docs/screenshots/admin-reports.png`
+![Reports](docs/screenshots/admin-reports.png)
+
+---
+
+### 🔹 9. Profile & User View
+
+`/docs/screenshots/profile-page.png`
+![Profile](docs/screenshots/profile-page.png)
+
+---
+
+
+
+## 🧠 Core Concept (IMPORTANT)
+
+RetailPOS is built around **3 key pillars**:
+
+### 1️⃣ Role-Based System (RBAC)
+
+| Role    | Access              |
+| ------- | ------------------- |
+| ADMIN   | Full system control |
+| CASHIER | POS only            |
+
+---
+
+### 2️⃣ Store-Based Isolation
+
+* Each user is assigned to **specific stores**
+* Users **CANNOT access other stores**
+* Admin can access **all stores**
+
+---
+
+### 3️⃣ Mode-Based Execution
+
+| Mode  | Purpose                |
+| ----- | ---------------------- |
+| ADMIN | Monitoring & control   |
+| POS   | Billing & transactions |
+
+---
+
+## 🔐 Authentication Flow (Real System Logic)
+
+```text
+User logs in
+   ↓
+Backend validates (JWT issued)
+   ↓
+Frontend stores session
+   ↓
+Redirect logic:
+   ADMIN   → /admin
+   CASHIER → /pos
+```
+
+👉 No ambiguity
+👉 No "mode confusion"
+👉 Deterministic routing
+
+---
+
+## ⚙️ Features
+
+### 🖥️ Admin Panel
+
+* 📊 Real-time dashboard (revenue, refunds, alerts)
+* 👥 User approval & role assignment
+* 🏬 Store management
+* 📦 Inventory control
+* 📈 Reports & analytics
+* 💸 Refund approvals
+* 🔐 Access control system
+
+---
+
+### 🛒 POS Terminal
+
+* ⚡ Ultra-fast billing
+* 🔍 Barcode-ready input
+* 🧮 GST + tax calculations
+* 💳 Payment processing
+* 🧾 Receipt generation (PDF + Thermal)
+* 🔄 Refund initiation
+
+---
+
+## 🔄 Refund System (Advanced)
+
+* Multi-step approval flow
+* Audit tracking
+* Admin-controlled settlement
+
+---
+
+### 👥 User Lifecycle
+
+```text
+Signup → Pending Approval → Admin Assigns Role + Store → Activated
+```
+
+---
+
+### 🔒 Security
+
+* JWT Authentication
+* Role-based authorization
+* Store-level data isolation
+* Session validation guards
+
+---
+
+## 🏗️ Architecture & Communication
+
+### 🔹 Microservices-Based Design
+RetailPOS follows a highly decoupled **Microservices Architecture**, where each domain (Auth, Product, Billing, Admin) is an independent service with its own database, ensuring high availability and fault isolation.
+
+| Service        | Responsibility          | Tech Stack          |
+| -------------- | ----------------------- | ------------------- |
+| **AuthService** | Identity, JWT & RBAC    | .NET 9, SQL Server  |
+| **ProductService** | Inventory & Catalog  | .NET 9, SQL Server  |
+| **BillingService** | Transactions & Lifecycle| .NET 9, SQL Server  |
+| **AdminService** | Aggregation & Analytics | .NET 9, SQL Server  |
+| **ApiGateway**  | Routing & Authentication| .NET 9, Ocelot      |
+
+---
+
+### 🔹 Event-Driven Communication (RabbitMQ)
+The system uses **RabbitMQ (via MassTransit)** for asynchronous, eventual consistency between services. This ensures that a sale in the Billing service correctly updates stock in the Product service without tight coupling.
+
+#### 📦 Key Event Flows
+
+| Event | Publisher | Subscriber | Action |
+| :--- | :--- | :--- | :--- |
+| `BillCreatedEvent` | BillingService | ProductService | Initiates stock reservation check. |
+| `StockReservedEvent` | ProductService | BillingService | Confirms stock availability to proceed with checkout. |
+| `BillCompletedEvent` | BillingService | ProductService | Finalizes stock deduction after successful payment. |
+| `BillCancelledEvent` | BillingService | ProductService | Restores reserved stock back to the catalog. |
+| `UserCreatedEvent` | AuthService | AdminService | Notifies admin for role and store assignment. |
+| `UserRoleUpdatedEvent` | AdminService | AuthService | Synchronizes updated permissions across the system. |
+
+---
+
+### 🔹 Frontend Architecture
+*   **Angular (Standalone Components)**: Optimized for performance and lazy loading.
+*   **Reactive State**: Using RxJS for real-time terminal updates.
+*   **Secure Guards**: Logic-based `UrlTree` redirections to prevent loops.
+
+---
+
+## 🔄 System Flow
+
+### Admin Flow
+
+```text
+Login → Dashboard → Manage Stores/Users → Monitor System
+```
+
+---
+
+### Cashier Flow
+
+```text
+Login → POS Terminal → Billing → Payment → Receipt
+```
+
+---
+
+## 🚀 Getting Started
+
+### 🔧 Prerequisites
+
+* .NET 9 SDK
+* Node.js (v20+)
+* SQL Server
+* RabbitMQ
+
+---
+
+### ⚙️ Backend Setup
+
+```bash
+git clone <your-repo>
+cd project-root
+```
+
+Update DB in all services:
+
+```json
+"ConnectionStrings": {
+  "DefaultConnection": "your-sql-server"
+}
+```
+
+Run migrations:
+
+```bash
+dotnet ef database update
+```
+
+Start services:
+
+```text
+AuthService
+ProductService
+BillingService
+AdminService
+ApiGateway
+```
+
+---
+
+### 🌐 Frontend Setup
+
+```bash
+cd pos-frontend
+npm install
+npm start
+```
+
+Open:
+
+```text
+http://localhost:4200
+```
+
+---
+
+## 📁 Folder Structure
+
+```text
+ApiGateway/
+AuthService/
+ProductService/
+BillingService/
+AdminService/
+Shared.Contracts/
+Shared.Messaging/
+pos-frontend/
+docs/screenshots/
+```
+---
+
+## ⚠️ Known Edge Cases (Handled)
+
+* ✅ Prevent redirect loops
+* ✅ Role-based routing
+* ✅ Store isolation enforcement
+* ✅ Session persistence
+* ✅ Unauthorized access blocking
+* ✅ Admin approval flow
+
+---
+
+## 💡 Future Enhancements
+
+* 📱 Mobile POS app
+* 📡 Offline sync mode
+* 🧠 AI sales insights
+* 🧾 GST invoice export (India-ready)
+* 🔔 Notification system
+
+---
+
+## 🏁 Conclusion
+
+RetailPOS is not just a CRUD app —
+it’s a **real-world enterprise system simulation** with:
+
+* Clean architecture
+* Strong domain separation
+* Production-like flows
+
+---
+
+

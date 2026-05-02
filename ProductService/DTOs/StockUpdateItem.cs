@@ -1,0 +1,15 @@
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ProductService.DTOs
+{
+    public class StockUpdateItem
+    {
+        [Required]
+        [NotEmptyGuid(ErrorMessage = "ProductId is required")]
+        public Guid ProductId { get; set; }
+
+        [Range(int.MinValue, int.MaxValue)]
+        public int Quantity { get; set; }
+    }
+}

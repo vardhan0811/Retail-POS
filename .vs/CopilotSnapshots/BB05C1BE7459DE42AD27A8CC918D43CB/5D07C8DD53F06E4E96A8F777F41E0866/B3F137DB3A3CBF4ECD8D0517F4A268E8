@@ -1,0 +1,39 @@
+﻿using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace BillingService.Migrations
+{
+    /// <inheritdoc />
+    public partial class BillingService_LifecycleAndContractHardening : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AddColumn<string>(
+                name: "BillNumber",
+                table: "Bills",
+                type: "nvarchar(450)",
+                nullable: false,
+                defaultValue: "");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Bills_BillNumber",
+                table: "Bills",
+                column: "BillNumber",
+                unique: true);
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropIndex(
+                name: "IX_Bills_BillNumber",
+                table: "Bills");
+
+            migrationBuilder.DropColumn(
+                name: "BillNumber",
+                table: "Bills");
+        }
+    }
+}

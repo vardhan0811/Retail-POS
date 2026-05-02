@@ -1,0 +1,68 @@
+<div class="receipt-container">
+  <div class="header">
+    <svg class="logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 4L14 8L18 9L15 12L16 16L12 14L8 16L9 12L6 9L10 8L12 4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M4 10C4 10 6 7 12 7C18 7 20 10 20 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <div class="store-name">{{ data?.storeName }}</div>
+    <div class="store-address">{{ data?.storeAddress }}</div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="info-grid">
+    <span>BILL NO:</span> <strong>{{ data?.billNumber }}</strong>
+    <span>DATE:</span> <span>{{ formattedDate }}</span>
+    <span>CASHIER:</span> <span>{{ data?.cashierId }}</span>
+    <span>STATUS:</span> <span>{{ data?.status }}</span>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="items-header">
+    <span>ITEM</span>
+    <span style="text-align: right">QTY/PRC</span>
+    <span style="text-align: right">TOTAL</span>
+  </div>
+
+  <div *ngFor="let item of data?.items" class="item-row">
+    <div class="item-name">{{ item.name }}</div>
+    <div class="item-qty-price">{{ item.quantity }} x {{ item.unitPrice | number:'1.2-2' }}</div>
+    <div class="item-total">{{ item.totalPrice | number:'1.2-2' }}</div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="totals-section">
+    <div class="total-row">
+      <span>SUBTOTAL:</span>
+      <span style="text-align: right">{{ data?.subTotal | number:'1.2-2' }}</span>
+    </div>
+    <div class="total-row">
+      <span>TAX:</span>
+      <span style="text-align: right">{{ data?.tax | number:'1.2-2' }}</span>
+    </div>
+    <div *ngIf="data?.discount > 0" class="total-row">
+      <span>DISCOUNT:</span>
+      <span style="text-align: right">-{{ data?.discount | number:'1.2-2' }}</span>
+    </div>
+    <div class="total-row grand-total">
+      <span>TOTAL:</span>
+      <span style="text-align: right">{{ data?.total | number:'1.2-2' }}</span>
+    </div>
+  </div>
+
+  <div class="payment-section">
+    <div>PAYMENT: {{ data?.paymentMethod }}</div>
+    <div *ngIf="data?.paymentId">ID: {{ data?.paymentId }}</div>
+    <div *ngIf="data?.transactionReference">REF: {{ data?.transactionReference }}</div>
+  </div>
+
+  <div class="footer">
+    <div>{{ data?.footer }}</div>
+    <div class="qr-placeholder">
+      SCAN FOR E-INVOICE
+    </div>
+    <div style="margin-top: 5mm; font-size: 8px;">Software by Retail POS v2.0</div>
+  </div>
+</div>

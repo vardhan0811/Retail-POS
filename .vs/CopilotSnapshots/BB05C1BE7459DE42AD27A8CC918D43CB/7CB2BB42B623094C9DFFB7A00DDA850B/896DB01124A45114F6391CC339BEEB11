@@ -1,0 +1,136 @@
+﻿using AdminService.Data;
+using AdminService.DTOs;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("api/admin/dashboard")]
+    public class DashboardController : ControllerBase
+    {
+        private readonly AdminDbContext _db;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _config;
+        private readonly ILogger<DashboardController> _logger;
+
+        public DashboardController(AdminDbContext db, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger<DashboardController> logger)
+        {
+            _db = db;
+            _httpClientFactory = httpClientFactory;
+            _config = config;
+            _logger = logger;
+        }
+
+        private HttpClient CreateClientWithAuth()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+
+            var authHeader = Request.Headers.Authorization.ToString();
+            if (!string.IsNullOrWhiteSpace(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var token = authHeader.Substring("Bearer ".Length).Trim();
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return client;
+        }
+
+        [Authorize(Policy = "VIEW_ADMIN_DASHBOARD")]
+        [HttpGet]
+        public async Task<IActionResult> GetDashboard([FromQuery] Guid? storeId = null)
+        {
+            var totalUsers = await _db.Users.CountAsync();
+            var activeUsers = await _db.Users.CountAsync(u => u.IsActive);
+
+            var totalStores = await _db.Stores.CountAsync();
+            var activeStores = await _db.Stores.CountAsync(s => s.IsActive);
+
+            decimal revenue = 0;
+            int todayBillsCount = 0;
+            object? productSection = null;
+
+            var billingServiceBaseUrl = _config["ServiceUrls:BillingService"];
+            var productServiceBaseUrl = _config["ServiceUrls:ProductService"];
+
+            if (string.IsNullOrWhiteSpace(billingServiceBaseUrl) || string.IsNullOrWhiteSpace(productServiceBaseUrl))
+            {
+                _logger.LogError("ServiceUrls config is missing for BillingService or ProductService");
+                return StatusCode(500, new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Downstream service URLs are not configured",
+                    Data = null
+                });
+            }
+
+            var client = CreateClientWithAuth();
+
+            try
+            {
+                var revenueEndpoint = storeId.HasValue
+                    ? $"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/reports/revenue?storeId={storeId.Value}"
+                    : $"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/reports/revenue";
+
+                var revenueResp = await client.GetAsync(revenueEndpoint);
+                if (revenueResp.IsSuccessStatusCode)
+                {
+                    var revenuePayload = await revenueResp.Content.ReadFromJsonAsync<ApiResponse<decimal>>();
+                    revenue = revenuePayload?.Data ?? 0m;
+                }
+
+                var salesEndpoint = storeId.HasValue
+                    ? $"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/reports/sales?storeId={storeId.Value}"
+                    : $"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/reports/sales";
+
+                var todayResp = await client.GetAsync(salesEndpoint);
+                if (todayResp.IsSuccessStatusCode)
+                {
+                    var todayPayload = await todayResp.Content.ReadFromJsonAsync<ApiResponse<IReadOnlyList<BillViewDto>>>();
+                    todayBillsCount = todayPayload?.Data?.Count ?? 0;
+                }
+
+                if (storeId.HasValue)
+                {
+                    var stockResp = await client.GetAsync($"{productServiceBaseUrl.TrimEnd('/')}/api/products/stock-summary?storeId={storeId.Value}");
+                    if (stockResp.IsSuccessStatusCode)
+                    {
+                        var stockPayload = await stockResp.Content.ReadFromJsonAsync<ApiResponse<object>>();
+                        productSection = stockPayload?.Data;
+                    }
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Dashboard downstream call failed");
+                return StatusCode(503, new ApiResponse<object> { Success = false, Message = "Dashboard dependencies unavailable", Data = null });
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogError(ex, "Dashboard downstream call timed out");
+                return StatusCode(503, new ApiResponse<object> { Success = false, Message = "Dashboard dependencies timeout", Data = null });
+            }
+
+            var data = new DashboardResponseDto
+            {
+                Users = new { Total = totalUsers, Active = activeUsers, Inactive = totalUsers - activeUsers },
+                Stores = new { Total = totalStores, Active = activeStores, Inactive = totalStores - activeStores },
+                Billing = new { TotalRevenue = revenue, TodayBillsCount = todayBillsCount },
+                Product = productSection
+            };
+
+            return Ok(new ApiResponse<DashboardResponseDto>
+            {
+                Success = true,
+                Message = "Dashboard data fetched successfully",
+                Data = data
+            });
+        }
+    }
+}

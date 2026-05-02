@@ -37,14 +37,14 @@ namespace AdminService.Migrations
 
                     b.Property<string>("ReportType")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid>("StoreId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("StoreId", "ReportType", "CreatedAt");
 
                     b.ToTable("AdminReports");
                 });
@@ -110,14 +110,13 @@ namespace AdminService.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Role")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("StoreId")
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("StoreId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("UserName")
@@ -131,20 +130,46 @@ namespace AdminService.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("AdminService.Entities.AdminReport", b =>
+            modelBuilder.Entity("AdminService.Entities.UserStore", b =>
                 {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("UserId", "StoreId");
+
+                    b.HasIndex("StoreId");
+
+                    b.ToTable("UserStores");
+                });
+
+            modelBuilder.Entity("AdminService.Entities.UserStore", b =>
+                {
+                    b.HasOne("AdminService.Entities.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("AdminService.Entities.User", "User")
-                        .WithMany("AdminReports")
+                        .WithMany("UserStores")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Store");
 
                     b.Navigation("User");
                 });
 
             modelBuilder.Entity("AdminService.Entities.User", b =>
                 {
-                    b.Navigation("AdminReports");
+                    b.Navigation("UserStores");
                 });
 #pragma warning restore 612, 618
         }

@@ -26,8 +26,8 @@ namespace BillingService.Controllers
             [FromQuery] DateTime? to = null,
             [FromQuery] string? search = null,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20,
-            [FromQuery] string? sortBy = null)
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? sortBy = "date_desc")
         {
             var result = await _service.GetPagedAsync(page, pageSize, status, userId, storeId, from, to, sortBy, search);
             return Ok(new ApiResponse<PagedResult<BillDto>>
@@ -47,83 +47,50 @@ namespace BillingService.Controllers
             if (result == null)
                 return NotFound(new ApiResponse<object> { Success = false, Message = "Bill not found", Data = null });
 
-            var response = new BillDto
-            {
-                Id = result.Id,
-                BillNumber = result.BillNumber,
-                StoreId = result.StoreId,
-                UserId = result.UserId,
-                TotalAmount = result.TotalAmount,
-                TaxAmount = result.TaxAmount,
-                FinalAmount = result.FinalAmount,
-                PaymentId = result.PaymentId,
-                CreatedAt = result.CreatedAt,
-                Status = result.Status,
-                Items = result.Items
-            };
-
             return Ok(new ApiResponse<BillDto>
             {
                 Success = true,
                 Message = "Bill fetched successfully",
-                Data = response
-            });
-        }
-
-        [Authorize(Policy = "VIEW_BILL")]
-        [HttpGet("reports/revenue")]
-        public async Task<IActionResult> GetRevenueReport([FromQuery] Guid? storeId = null)
-        {
-            var result = storeId.HasValue
-                ? await _service.GetStoreRevenueAsync(storeId.Value)
-                : await _service.GetTotalRevenueAsync();
-
-            return Ok(new ApiResponse<decimal>
-            {
-                Success = true,
-                Message = "Revenue report fetched successfully",
                 Data = result
             });
         }
 
         [Authorize(Policy = "VIEW_BILL")]
-        [HttpGet("reports/sales")]
-        public async Task<IActionResult> GetSalesReport([FromQuery] Guid? storeId = null)
+        [HttpGet("dashboard/summary")]
+        public async Task<IActionResult> GetDashboardSummary()
         {
-            var now = DateTime.UtcNow;
-            var from = now.Date;
-            var to = from.AddDays(1).AddTicks(-1);
+            var storeIdStr = User.FindFirst("storeId")?.Value;
+            Guid? storeId = null;
+            if (!string.IsNullOrEmpty(storeIdStr) && Guid.TryParse(storeIdStr, out var parsedStoreId))
+            {
+                storeId = parsedStoreId;
+            }
 
-            var result = await _service.GetPagedAsync(
-                page: 1,
-                pageSize: 500,
-                status: null,
-                userId: null,
-                storeId: storeId,
-                start: from,
-                end: to,
-                sortBy: "date_desc",
-                search: null);
-
-            return Ok(new ApiResponse<IReadOnlyList<BillDto>>
+            var summary = await _service.GetDashboardSummaryAsync(storeId);
+            return Ok(new ApiResponse<SalesDashboardSummaryDto>
             {
                 Success = true,
-                Message = "Sales report fetched successfully",
-                Data = result.Items
+                Message = "Dashboard summary retrieved successfully",
+                Data = summary
             });
         }
 
         [Authorize(Policy = "VIEW_BILL")]
-        [HttpGet("reports/top-products")]
-        public async Task<IActionResult> GetTopProductsReport([FromQuery] Guid storeId, [FromQuery] int count = 10)
+        [HttpGet("dashboard/operator-summary")]
+        public async Task<IActionResult> GetOperatorSummary()
         {
-            var result = await _service.GetTopProductsAsync(storeId, count);
+            var userIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+            {
+                return Unauthorized(new ApiResponse<object> { Success = false, Message = "User ID not found in token." });
+            }
 
-            return Ok(new ApiResponse<IReadOnlyList<TopProductDto>>
+            var summary = await _service.GetOperatorSummaryAsync(userId);
+            return Ok(new ApiResponse<OperatorSummaryDto>
             {
                 Success = true,
-                Message = "Top products report fetched successfully",
-                Data = result
+                Message = "Operator summary retrieved successfully",
+                Data = summary
             });
         }
 

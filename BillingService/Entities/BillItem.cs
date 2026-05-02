@@ -1,4 +1,4 @@
-﻿namespace BillingService.Entities
+namespace BillingService.Entities
 {
     public class BillItem
     {
@@ -20,5 +20,10 @@
         public decimal TaxPercentage { get; set; }
 
         public decimal TotalPrice { get; set; }
+        public bool IsRefundable { get; set; } = true;
+        public int RefundWindowHours { get; set; } = 24;
+        public int RefundedQuantity { get; set; } = 0;
+        public bool IsRefunded { get; set; } = false;
+
     }
 }

@@ -1,0 +1,12 @@
+﻿using Microsoft.Extensions.Configuration;
+using RabbitMQ.Client;
+using System.Text;
+using System.Text.Json;
+
+namespace BillingService.Services
+{
+    public class RabbitMqPublisher : RabbitMqPublisherBase
+    {
+        public RabbitMqPublisher(IConfiguration config) : base(config) { }
+    }
+}

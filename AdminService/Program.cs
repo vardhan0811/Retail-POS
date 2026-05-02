@@ -78,8 +78,11 @@ namespace AdminService
 
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IStoreRepository, StoreRepository>();
+            builder.Services.AddScoped<IAdminReportRepository, AdminReportRepository>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IStoreService, StoreService>();
+            builder.Services.AddScoped<IAdminReportService, AdminReportService>();
+            builder.Services.AddMemoryCache();
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddHttpClient();
 
@@ -93,6 +96,7 @@ namespace AdminService
             builder.Services.AddSingleton<RabbitMqPublisherBase>();
             builder.Services.AddHostedService<UserCreatedConsumerHostedService>();
             builder.Services.AddHostedService<StoreCreatedConsumerHostedService>();
+            builder.Services.AddHostedService<AdminReportConsumerHostedService>();
 
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();

@@ -1,0 +1,174 @@
+﻿using BillingService.Data;
+using BillingService.Repositories;
+using BillingService.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 🔥 DB
+builder.Services.AddDbContext<BillingDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// 🔥 JWT AUTH (MUST MATCH AUTHSERVICE)
+builder.Services.AddAuthentication("Bearer")
+var jwtKey = builder.Configuration["Jwt:Key"];
+var audiences = builder.Configuration.GetSection("Jwt:Audiences").Get<string[]>();
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = true,
+            ValidAudiences = audiences,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+// 🔥 AUTHORIZATION POLICIES (THIS WAS MISSING)
+builder.Services.AddAuthorization(options =>
+{
+    // --- BILLING POLICIES ---
+    // Map each policy to required claims/roles for fine-grained access control
+    options.AddPolicy("CREATE_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "CREATE_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Manager")
+        ));
+
+    options.AddPolicy("VIEW_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "VIEW_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Manager") || ctx.User.IsInRole("Cashier")
+        ));
+
+    options.AddPolicy("CANCEL_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "CANCEL_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Manager")
+        ));
+
+    options.AddPolicy("RETRY_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "RETRY_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Manager")
+        ));
+
+    options.AddPolicy("REFUND_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "REFUND_BILL") ||
+            ctx.User.IsInRole("Admin")
+        ));
+
+    options.AddPolicy("MARK_PAID_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "MARK_PAID_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Manager")
+        ));
+
+    options.AddPolicy("ADD_NOTE_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "ADD_NOTE_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Manager")
+        ));
+
+    options.AddPolicy("EXPORT_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "EXPORT_BILL") ||
+            ctx.User.IsInRole("Admin")
+        ));
+
+    // --- DEFAULT POLICY: Deny by default (defense in depth) ---
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
+// 🔥 DEPENDENCIES
+builder.Services.AddScoped<IBillingRepository, BillingRepository>();
+builder.Services.AddScoped<IBillingService, BillingServices>();
+builder.Services.AddSingleton<RabbitMqPublisher>(); // Singleton since it manages its own connections
+builder.Services.AddScoped<RabbitMqConsumer>(); // Scoped since it uses DbContext
+
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient<IProductClient, ProductClient>(client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5002/");
+});
+builder.Services.AddHttpClient<IUserClient, UserClient>(client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5001/"); // AdminService base URL
+});
+builder.Services.AddHttpClient<IStoreClient, StoreClient>(client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5003/"); // StoreService base URL
+});
+
+// 🔥 CONTROLLERS + SWAGGER
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
+builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter 'Bearer <token>'"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var consumer = scope.ServiceProvider.GetRequiredService<RabbitMqConsumer>();
+    consumer.Start();
+}
+
+// 🔥 PIPELINE
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
+app.UseAuthentication();  // MUST COME BEFORE AUTHORIZATION
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();

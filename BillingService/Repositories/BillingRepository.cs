@@ -22,7 +22,10 @@ namespace BillingService.Repositories
 
         public async Task<Bill?> GetByIdAsync(Guid id)
         {
-            return await _context.Bills.Include(b => b.Items).FirstOrDefaultAsync(b => b.Id == id);
+            return await _context.Bills
+                .Include(b => b.Items)
+                .Include(b => b.AuditLogs)
+                .FirstOrDefaultAsync(b => b.Id == id);
         }
 
         public async Task<Bill?> GetByIdNoTrackingAsync(Guid id)
@@ -30,12 +33,29 @@ namespace BillingService.Repositories
             return await _context.Bills
                 .AsNoTracking()
                 .Include(b => b.Items)
+                .Include(b => b.AuditLogs)
                 .FirstOrDefaultAsync(b => b.Id == id);
         }
 
         public async Task<IEnumerable<Bill>> GetAllAsync()
         {
             return await _context.Bills.Include(b => b.Items).ToListAsync();
+        }
+
+        public IQueryable<Bill> GetAllQuery()
+        {
+            return _context.Bills
+                .Include(b => b.Items)
+                .Include(b => b.AuditLogs)
+                .AsQueryable();
+        }
+
+        public IQueryable<RefundRequest> GetAllRefundRequestsQuery()
+        {
+            return _context.RefundRequests
+                .Include(r => r.Bill)
+                .Include(r => r.Items)
+                .AsQueryable();
         }
 
         public async Task<IEnumerable<Bill>> GetByStatusAsync(BillStatus status)
@@ -92,7 +112,8 @@ namespace BillingService.Repositories
         {
             return await _context.Bills
                 .Include(b => b.Items)
-                .FirstOrDefaultAsync(b => b.Id.ToString() == billNumber);
+                .Include(b => b.AuditLogs)
+                .FirstOrDefaultAsync(b => b.BillNumber == billNumber || b.Id.ToString() == billNumber);
         }
 
         public async Task<IEnumerable<Bill>> SearchAsync(string numberOrReference)
@@ -176,7 +197,7 @@ namespace BillingService.Repositories
         public async Task<(IReadOnlyList<Bill>, int)> GetPagedAsync(int page, int pageSize, string? status, Guid? userId, Guid? storeId, DateTime? start, DateTime? end, string? sortBy, string? search)
         {
             var query = _context.Bills.Include(b => b.Items).AsQueryable();
-            if (!string.IsNullOrEmpty(status))
+            if (!string.IsNullOrEmpty(status) && status != "undefined" && status != "null")
             {
                 if (Enum.TryParse<BillStatus>(status, true, out var parsedStatus))
                     query = query.Where(b => b.Status == parsedStatus);
@@ -208,8 +229,98 @@ namespace BillingService.Repositories
                 };
             }
             var total = await query.CountAsync();
-            var bills = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var skip = Math.Max(0, (page - 1) * pageSize);
+            var bills = await query.Skip(skip).Take(pageSize).ToListAsync();
             return (bills, total);
+        }
+
+        public async Task<SalesSummaryDto> GetSalesSummaryAsync(string? status, Guid? userId, Guid? storeId, DateTime? start, DateTime? end, string? search)
+        {
+            var query = _context.Bills.AsQueryable();
+
+            if (!string.IsNullOrEmpty(status) && status != "undefined" && status != "null")
+            {
+                if (Enum.TryParse<BillStatus>(status, true, out var parsedStatus))
+                    query = query.Where(b => b.Status == parsedStatus);
+                else
+                    query = query.Where(_ => false);
+            }
+            if (userId.HasValue)
+                query = query.Where(b => b.UserId == userId);
+            if (storeId.HasValue)
+                query = query.Where(b => b.StoreId == storeId);
+            if (start.HasValue)
+                query = query.Where(b => b.CreatedAt >= start.Value);
+            if (end.HasValue)
+                query = query.Where(b => b.CreatedAt <= end.Value);
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(b => b.BillNumber.Contains(term));
+            }
+
+            var stats = await query
+                .GroupBy(_ => 1)
+                .Select(g => new
+                {
+                    TotalRevenue = g.Sum(b => (decimal?)b.FinalAmount) ?? 0,
+                    TotalTaxes = g.Sum(b => (decimal?)b.TaxAmount) ?? 0,
+                    TotalOrders = g.Count(),
+                    AverageOrderValue = g.Average(b => (decimal?)b.FinalAmount) ?? 0
+                })
+                .FirstOrDefaultAsync();
+
+            return new SalesSummaryDto
+            {
+                TotalRevenue = stats?.TotalRevenue ?? 0,
+                TotalTaxes = stats?.TotalTaxes ?? 0,
+                TotalOrders = stats?.TotalOrders ?? 0,
+                AverageOrderValue = stats?.AverageOrderValue ?? 0
+            };
+        }
+
+        public async Task AddRefundRequestAsync(RefundRequest request)
+        {
+            await _context.RefundRequests.AddAsync(request);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<RefundRequest?> GetRefundRequestByIdAsync(Guid id)
+        {
+            return await _context.RefundRequests
+                .Include(r => r.Bill)
+                    .ThenInclude(b => b.Items)
+                .Include(r => r.Items)
+                .FirstOrDefaultAsync(r => r.Id == id);
+        }
+
+        public async Task UpdateRefundRequestAsync(RefundRequest request)
+        {
+            _context.RefundRequests.Update(request);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<IEnumerable<RefundRequest>> GetRefundRequestsV2Async(Guid? storeId, RefundStatus? status)
+        {
+            var query = _context.RefundRequests
+                .Include(r => r.Bill)
+                    .ThenInclude(b => b.Items)
+                .Include(r => r.Items)
+                .AsNoTracking()
+                .AsQueryable();
+
+            if (storeId.HasValue)
+                query = query.Where(r => r.Bill.StoreId == storeId);
+
+            if (status.HasValue)
+                query = query.Where(r => r.Status == status);
+
+            return await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
+        }
+
+        public async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync()
+        {
+            return await _context.Database.BeginTransactionAsync();
         }
 
         public async Task<string> ExportCsvAsync()
@@ -222,6 +333,23 @@ namespace BillingService.Repositories
                 builder.AppendLine($"{b.Id},{b.BillNumber},{b.StoreId},{b.UserId},{b.TotalAmount},{b.TaxAmount},{b.FinalAmount},{b.CreatedAt:O},{b.Status}");
             }
             return builder.ToString();
+        }
+
+        public async Task AddAuditLogAsync(BillAuditLog auditLog)
+        {
+            await _context.BillAuditLogs.AddAsync(auditLog);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<IdempotencyRecord?> GetIdempotencyRecordAsync(string id)
+        {
+            return await _context.IdempotencyRecords.FirstOrDefaultAsync(i => i.Id == id);
+        }
+
+        public async Task AddIdempotencyRecordAsync(IdempotencyRecord record)
+        {
+            await _context.IdempotencyRecords.AddAsync(record);
+            await _context.SaveChangesAsync();
         }
     }
 }

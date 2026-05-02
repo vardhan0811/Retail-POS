@@ -1,0 +1,29 @@
+﻿using RabbitMQ.Client;
+using System.Text;
+using System.Text.Json;
+
+namespace AuthService.Services
+{
+    public class RabbitMqPublisher
+    {
+        private readonly string _hostname = "localhost";
+        private readonly string _username = "guest";
+        private readonly string _password = "guest";
+        private IConnection _connection;
+
+        public RabbitMqPublisher()
+        {
+            var factory = new ConnectionFactory { HostName = _hostname, UserName = _username, Password = _password };
+            _connection = factory.CreateConnection();
+        }
+
+        public void Publish<T>(T message, string queue)
+        {
+            using var channel = _connection.CreateModel();
+            channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false, arguments: null);
+            var json = JsonSerializer.Serialize(message);
+            var body = Encoding.UTF8.GetBytes(json);
+            channel.BasicPublish(exchange: "", routingKey: queue, basicProperties: null, body: body);
+        }
+    }
+}

@@ -1,0 +1,104 @@
+﻿using AuthService.Data;
+using AuthService.DTOs;
+using AuthService.Entities;
+using AuthService.Repositories;
+using Microsoft.EntityFrameworkCore;
+
+namespace AuthService.Services
+{
+    public class AuthServices : IAuthService
+    {
+        private readonly IUserRepository _userRepository;
+        private readonly IJwtService _jwtService;
+        private readonly AuthDbContext _context;
+
+        public AuthServices(
+            IUserRepository userRepository,
+            IJwtService jwtService,
+            AuthDbContext context)
+        {
+            _userRepository = userRepository;
+            _jwtService = jwtService;
+            _context = context;
+        }
+
+        public async Task RegisterAsync(RegisterRequest request)
+        {
+            // Step 1: Check existing user
+            var existingUser = await _userRepository.GetByEmailAsync(request.Email);
+            if (existingUser != null)
+                throw new Exception("User already exists");
+
+            // Step 2: Get default role (Cashier)
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Cashier");
+            if (role == null)
+                throw new Exception("Cashier role not found");
+
+            // Step 3: Hash password
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            // Step 4: Create user
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Name = request.Name,
+                Email = request.Email,
+                PasswordHash = passwordHash,
+                RoleId = role.Id,
+                StoreId = request.StoreId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // Step 5: Save
+            await _userRepository.AddAsync(user);
+
+            // Step 6: Publish UserCreatedEvent to RabbitMQ
+            var publisher = (RabbitMqPublisher)Program.ServiceProvider.GetService(typeof(RabbitMqPublisher));
+            if (publisher != null)
+            {
+                var evt = new Events.UserCreatedEvent
+                {
+                    UserId = user.Id,
+                    Email = user.Email,
+                    Role = role.Name,
+                    CreatedAt = user.CreatedAt
+                };
+                publisher.Publish(evt, "user.created");
+            }
+        }
+
+        public async Task<AuthResponse> LoginAsync(LoginRequest request)
+        {
+            // 🔹 Step 1: Fetch user with role + permissions
+            var user = await _userRepository
+                .GetUserWithRoleAndPermissions(request.Email);
+
+            if (user == null)
+                throw new Exception("Invalid credentials");
+
+            // 🔹 Step 2: Verify password
+            var isValid = BCrypt.Net.BCrypt.Verify(
+                request.Password,
+                user.PasswordHash);
+
+            if (!isValid)
+                throw new Exception("Invalid credentials");
+
+            // 🔹 Step 3: Extract permissions safely
+            var permissions = user.Role?.RolePermissions?
+                .Select(rp => rp.Permission.Name)
+                .ToList() ?? new List<string>();
+
+            // 🔹 Step 4: Generate JWT
+            var token = _jwtService.GenerateToken(user, permissions);
+
+            // 🔹 Step 5: Return response
+            return new AuthResponse
+            {
+                Token = token,
+                Email = user.Email
+            };
+        }
+    }
+}

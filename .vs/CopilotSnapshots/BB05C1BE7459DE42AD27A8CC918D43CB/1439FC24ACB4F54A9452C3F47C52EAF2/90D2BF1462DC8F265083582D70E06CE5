@@ -1,0 +1,52 @@
+﻿using ProductService.Entities;
+
+namespace ProductService.Repositories
+{
+    public interface IProductRepository
+    {
+        // ---------------- BASIC CRUD ----------------
+        Task AddAsync(Product product);
+        Task<Product?> GetByIdAsync(Guid id);
+        Task UpdateAsync(Product product);
+        Task DeleteAsync(Product product);
+
+        // ---------------- EXISTS (NEW - IMPORTANT) ----------------
+        Task<bool> ExistsBySKUAsync(string sku, Guid storeId, Guid? excludeId = null);
+        Task<bool> ExistsByBarcodeAsync(string barcode, Guid storeId, Guid? excludeId = null);
+
+        // ---------------- SEARCH ----------------
+        Task<IEnumerable<Product>> SearchAsync(string query, Guid storeId);
+
+        // ---------------- PAGINATION ----------------
+        Task<(IEnumerable<Product>, int)> GetPagedAsync(
+            Guid storeId,
+            int page,
+            int pageSize,
+            string? search,
+            decimal? minPrice,
+            decimal? maxPrice,
+            string? sortBy);
+
+        // ---------------- CATEGORY ----------------
+        Task<IEnumerable<Category>> GetAllCategoriesAsync(Guid storeId);
+        Task<Category?> GetCategoryByIdAsync(Guid id);
+        Task<Category> CreateCategoryAsync(Category category);
+        Task<Category?> UpdateCategoryAsync(Guid id, Category update);
+        Task<bool> DeleteCategoryAsync(Guid id);
+
+        // ---------------- LOOKUP ----------------
+        Task<IEnumerable<Product>> LookupAsync(Guid storeId, string query);
+
+        // ---------------- FILTERS ----------------
+        Task<IEnumerable<Product>> GetByCategoryAsync(Guid categoryId, Guid storeId);
+        Task<IEnumerable<Product>> GetLowStockAsync(Guid storeId, int threshold);
+        Task<IEnumerable<Product>> GetOutOfStockAsync(Guid storeId);
+
+        // ---------------- STOCK ----------------
+        Task BulkUpdateStockAsync(IEnumerable<(Guid productId, int quantity)> updates);
+        Task<object> GetStockSummaryAsync(Guid storeId);
+
+        // ---------------- ANALYTICS ----------------
+        Task<IEnumerable<Product>> GetTopSellingAsync(Guid storeId, int count);
+    }
+}

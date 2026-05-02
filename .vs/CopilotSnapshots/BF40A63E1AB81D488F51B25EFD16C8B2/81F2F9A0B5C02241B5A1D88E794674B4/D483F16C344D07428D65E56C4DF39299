@@ -1,0 +1,23 @@
+﻿{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft.AspNetCore": "Warning"
+        }
+    },
+    "AllowedHosts": "*",
+    "EmailSettings": {
+        "FromEmail": "rayapureddyvardhan2004@gmail.com",
+        "AppPassword": "idsruieobjaoygpa"
+    },
+    "Jwt": {
+        "Key": "THIS_IS_SUPER_SECRET_KEY_1234567890",
+        "Audiences": [
+            "AuthService",
+            "AdminService",
+            "BillingService",
+            "ProductService",
+            "NotificationService"
+        ]
+    }
+}

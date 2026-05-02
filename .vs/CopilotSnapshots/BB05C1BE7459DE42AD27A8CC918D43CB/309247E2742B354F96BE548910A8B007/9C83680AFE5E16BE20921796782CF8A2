@@ -1,0 +1,251 @@
+﻿using BillingService.Data;
+using BillingService.HealthChecks;
+using BillingService.Middleware;
+using BillingService.Repositories;
+using BillingService.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using Serilog;
+using Shared.Messaging.RabbitMq;
+using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
+builder.Services.AddDbContext<BillingDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+var logPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Logs", "log-.txt");
+Log.Logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        path: logPath,
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14,
+        shared: true,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {UserEmail} {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+builder.Host.UseSerilog();
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    var localPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.Local.json");
+    throw new InvalidOperationException($"Missing config: Jwt:Key. Put it in '{localPath}' (gitignored).");
+}
+var issuer = builder.Configuration["Jwt:Issuer"];
+var audiences = builder.Configuration.GetSection("Jwt:Audiences").Get<string[]>()
+    ?? (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Audience"])
+        ? Array.Empty<string>()
+        : new[] { builder.Configuration["Jwt:Audience"]! });
+
+if (audiences.Length == 0)
+    throw new InvalidOperationException("Missing config: Jwt:Audiences (or Jwt:Audience)");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudiences = audiences,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CREATE_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "CREATE_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Cashier")));
+
+    options.AddPolicy("VIEW_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "VIEW_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Cashier")));
+
+    options.AddPolicy("CANCEL_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "CANCEL_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Cashier")));
+
+    options.AddPolicy("RETRY_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "RETRY_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Cashier")));
+
+    options.AddPolicy("REFUND_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "REFUND_BILL") ||
+            ctx.User.IsInRole("Admin")));
+
+    options.AddPolicy("MARK_PAID_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "MARK_PAID_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Cashier")));
+
+    options.AddPolicy("ADD_NOTE_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "ADD_NOTE_BILL") ||
+            ctx.User.IsInRole("Admin") || ctx.User.IsInRole("Cashier")));
+
+    options.AddPolicy("EXPORT_BILL",
+        policy => policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim("permission", "EXPORT_BILL") ||
+            ctx.User.IsInRole("Admin")));
+
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
+builder.Services.AddHealthChecks()
+    .AddCheck<SqlConnectionHealthCheck>("sql")
+    .AddCheck<RabbitMqHealthCheck>("rabbitmq");
+
+builder.Services.AddScoped<IBillingRepository, BillingRepository>();
+builder.Services.AddScoped<IBillingService, BillingServices>();
+
+builder.Services.AddSingleton<RabbitMqPublisherBase>();
+builder.Services.AddHostedService<RabbitMqConsumerHostedService>();
+
+builder.Services.AddHttpContextAccessor();
+
+var serviceUrls = builder.Configuration.GetSection("ServiceUrls");
+var productServiceUrl = serviceUrls["ProductService"] ?? "http://localhost:5002";
+var adminServiceUrl = serviceUrls["AdminService"] ?? "http://localhost:5004";
+
+builder.Services.AddHttpClient<IProductClient, ProductClient>(client =>
+{
+    client.BaseAddress = new Uri(productServiceUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+builder.Services.AddHttpClient<IUserClient, UserClient>(client =>
+{
+    client.BaseAddress = new Uri(adminServiceUrl.TrimEnd('/') + "/");
+});
+builder.Services.AddHttpClient<IStoreClient, StoreClient>(client =>
+{
+    client.BaseAddress = new Uri(adminServiceUrl.TrimEnd('/') + "/");
+});
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
+builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter 'Bearer <token>'"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+var app = builder.Build();
+
+app.UseMiddleware<ExceptionMiddleware>();
+
+app.UseHttpsRedirection();
+
+// Dependency gate (Development): if dependencies are unhealthy, block all endpoints (except /health)
+app.Use(async (context, next) =>
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        await next();
+        return;
+    }
+
+    if (context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase))
+    {
+        await next();
+        return;
+    }
+
+    var health = await context.RequestServices.GetRequiredService<HealthCheckService>()
+        .CheckHealthAsync(context.RequestAborted);
+
+    if (health.Status == HealthStatus.Healthy)
+    {
+        await next();
+        return;
+    }
+
+    var accept = context.Request.Headers.Accept.ToString();
+    var wantsHtml = accept.Contains("text/html", StringComparison.OrdinalIgnoreCase)
+                    || context.Request.Path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase);
+
+    if (wantsHtml)
+    {
+        context.Response.Redirect("/health");
+        return;
+    }
+
+    context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+    context.Response.ContentType = "application/json";
+    await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
+    {
+        success = false,
+        message = "Service dependencies are unhealthy. Check /health.",
+        status = health.Status.ToString()
+    }));
+});
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseAuthentication();
+app.UseMiddleware<SerilogUserContextMiddleware>();
+app.UseAuthorization();
+app.UseSerilogRequestLogging();
+
+app.MapGet("/", async (HttpContext ctx) =>
+{
+    var health = await ctx.RequestServices.GetRequiredService<HealthCheckService>()
+        .CheckHealthAsync(ctx.RequestAborted);
+    return health.Status == HealthStatus.Healthy
+        ? Results.Redirect("/swagger")
+        : Results.Redirect("/health");
+}).AllowAnonymous();
+
+app.MapControllers();
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = BillingService.HealthChecks.HealthCheckResponseWriter.WriteAsync
+}).AllowAnonymous();
+
+app.Run();

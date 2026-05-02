@@ -1,0 +1,18 @@
+﻿using BillingService.DTOs;
+
+namespace BillingService.Services
+{
+    public interface IBillingService
+    {
+        Task<object> CreateBillAsync(CreateBillRequest request, Guid userId, Guid storeId);
+        Task<object> GetByIdAsync(Guid id);
+        Task<IEnumerable<object>> GetAllAsync();
+        Task<IEnumerable<object>> GetByStatusAsync(string status);
+        Task<IEnumerable<object>> GetByUserAsync(Guid userId);
+        Task<IEnumerable<object>> GetByDateRangeAsync(DateTime start, DateTime end);
+        Task<IEnumerable<object>> GetTodayAsync();
+        Task<decimal> GetTotalRevenueAsync();
+        Task CancelAsync(Guid id);
+        Task RetryAsync(Guid id);
+    }
+}

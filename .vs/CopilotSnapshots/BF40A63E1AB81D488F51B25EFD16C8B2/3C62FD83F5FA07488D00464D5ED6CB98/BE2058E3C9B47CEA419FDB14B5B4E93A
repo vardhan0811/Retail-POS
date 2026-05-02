@@ -1,0 +1,67 @@
+﻿using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using System.Text;
+using System.Text.Json;
+using AdminService.Events;
+using Microsoft.Extensions.DependencyInjection;
+using AdminService.Services;
+
+namespace AdminService.Services
+{
+    public class RabbitMqConsumer
+    {
+        private readonly IServiceScopeFactory _scopeFactory;
+        public RabbitMqConsumer(IServiceScopeFactory scopeFactory)
+        {
+            _scopeFactory = scopeFactory;
+        }
+
+        public void Start()
+        {
+            var factory = new ConnectionFactory() { HostName = "localhost" };
+            var connection = factory.CreateConnection();
+            var channel = connection.CreateModel();
+
+            // Declare queues for each event
+            channel.QueueDeclare("user.created", false, false, false);
+            channel.QueueDeclare("user.rolechanged", false, false, false);
+            channel.QueueDeclare("user.deactivated", false, false, false);
+            channel.QueueDeclare("user.loggedin", false, false, false);
+
+            var consumer = new EventingBasicConsumer(channel);
+            consumer.Received += (model, ea) =>
+            {
+                var body = ea.Body.ToArray();
+                var routingKey = ea.RoutingKey;
+                var json = Encoding.UTF8.GetString(body);
+
+                using var scope = _scopeFactory.CreateScope();
+                var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+
+                switch (routingKey)
+                {
+                    case "user.created":
+                        var created = JsonSerializer.Deserialize<UserCreatedEvent>(json);
+                        userService.HandleUserCreatedEvent(created);
+                        break;
+                    case "user.rolechanged":
+                        var roleChanged = JsonSerializer.Deserialize<UserRoleChangedEvent>(json);
+                        userService.HandleUserRoleChangedEvent(roleChanged);
+                        break;
+                    case "user.deactivated":
+                        var deactivated = JsonSerializer.Deserialize<UserDeactivatedEvent>(json);
+                        userService.HandleUserDeactivatedEvent(deactivated);
+                        break;
+                    case "user.loggedin":
+                        // Optionally handle login event for audit
+                        break;
+                }
+            };
+
+            channel.BasicConsume("user.created", true, consumer);
+            channel.BasicConsume("user.rolechanged", true, consumer);
+            channel.BasicConsume("user.deactivated", true, consumer);
+            channel.BasicConsume("user.loggedin", true, consumer);
+        }
+    }
+}

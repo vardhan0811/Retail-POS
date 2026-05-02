@@ -1,0 +1,104 @@
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ProductService.Services
+{
+    public abstract class RabbitMqConsumerBase : BackgroundService
+    {
+        private readonly IConfiguration _config;
+        private readonly ILogger _logger;
+
+        private IConnection? _connection;
+        private IModel? _channel;
+
+        private readonly string _queueName;
+        private readonly string _exchange;
+        private readonly string _exchangeType;
+        private readonly string _dlx;
+        private readonly string _dlq;
+        private readonly string[] _routingKeys;
+
+        protected RabbitMqConsumerBase(IConfiguration config, ILogger logger, string queueName, params string[] routingKeys)
+        {
+            _config = config;
+            _logger = logger;
+            _queueName = queueName;
+
+            _exchange = _config["RabbitMQ:Exchange"] ?? "app.exchange";
+            _exchangeType = _config["RabbitMQ:ExchangeType"] ?? "topic";
+            _dlx = _config["RabbitMQ:DLX"] ?? "app.dlx";
+            _dlq = _config["RabbitMQ:DLQ"] ?? "dead-letter-queue";
+
+            _routingKeys = routingKeys;
+        }
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            var factory = new ConnectionFactory
+            {
+                HostName = _config["RabbitMQ:Host"],
+                UserName = _config["RabbitMQ:Username"],
+                Password = _config["RabbitMQ:Password"],
+                DispatchConsumersAsync = true
+            };
+
+            _connection = factory.CreateConnection();
+            _channel = _connection.CreateModel();
+
+            _channel.ExchangeDeclare(exchange: _exchange, type: _exchangeType, durable: true);
+
+            _channel.ExchangeDeclare(exchange: _dlx, type: "fanout", durable: true);
+            _channel.QueueDeclare(queue: _dlq, durable: true, exclusive: false, autoDelete: false);
+            _channel.QueueBind(queue: _dlq, exchange: _dlx, routingKey: "");
+
+            _channel.QueueDeclare(
+                queue: _queueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: new Dictionary<string, object> { { "x-dead-letter-exchange", _dlx } });
+
+            foreach (var key in _routingKeys)
+                _channel.QueueBind(queue: _queueName, exchange: _exchange, routingKey: key);
+
+            _channel.BasicQos(prefetchSize: 0, prefetchCount: 20, global: false);
+
+            var consumer = new AsyncEventingBasicConsumer(_channel);
+            consumer.Received += async (_, ea) =>
+            {
+                try
+                {
+                    await ProcessMessageAsync(ea.Body.ToArray(), ea.RoutingKey, stoppingToken);
+                    _channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "RabbitMQ message failed. Dead-lettering.");
+                    _channel.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: false);
+                }
+            };
+
+            _channel.BasicConsume(queue: _queueName, autoAck: false, consumer: consumer);
+
+            return Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+
+        protected abstract Task ProcessMessageAsync(byte[] body, string routingKey, CancellationToken ct);
+
+        public override void Dispose()
+        {
+            try { _channel?.Close(); } catch { }
+            try { _connection?.Close(); } catch { }
+            _channel?.Dispose();
+            _connection?.Dispose();
+            base.Dispose();
+        }
+    }
+}

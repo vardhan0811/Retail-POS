@@ -1,0 +1,26 @@
+﻿{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "Jwt": {
+    "Key": "THIS_IS_SUPER_SECRET_KEY_1234567890",
+    "Issuer": "AuthService",
+    "Audience": "Microservices"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=.\\SQLEXPRESS;Database=RetailPOS_Product;Trusted_Connection=True;TrustServerCertificate=True;"
+  },
+  "RabbitMQ": {
+    "Host": "localhost",
+    "Username": "guest",
+    "Password": "guest",
+    "Exchange": "app.exchange",
+    "ExchangeType": "topic",
+    "DLX": "app.dlx",
+    "DLQ": "dead-letter-queue"
+  }
+}

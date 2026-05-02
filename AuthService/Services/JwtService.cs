@@ -1,4 +1,4 @@
-﻿using AuthService.Entities;
+using AuthService.Entities;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -23,15 +23,36 @@ namespace AuthService.Services
                 throw new InvalidOperationException("JWT token audiences is empty (Jwt:TokenAudiences)");
         }
 
-        public string GenerateToken(User user, List<string> permissions)
+        public string GenerateToken(User user, List<string> permissions, Guid? sessionId = null, Guid? terminalId = null)
         {
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Name),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role.Name),
-                new Claim("storeId", user.StoreId.ToString())
             };
+
+            if (user.Role != null)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, user.Role.Name));
+            }
+
+            if (user.StoreId.HasValue)
+            {
+                claims.Add(new Claim("storeId", user.StoreId.Value.ToString()));
+            }
+            
+            if (sessionId.HasValue)
+            {
+                claims.Add(new Claim("sessionId", sessionId.Value.ToString()));
+            }
+            
+            if (terminalId.HasValue)
+            {
+                claims.Add(new Claim("terminalId", terminalId.Value.ToString()));
+            }
+
+            claims.Add(new Claim("status", user.Status.ToString()));
 
             foreach (var permission in permissions)
                 claims.Add(new Claim("permission", permission));

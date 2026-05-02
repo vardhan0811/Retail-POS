@@ -1,0 +1,84 @@
+﻿# Copilot Instructions
+
+## Core Architecture Rules
+- Follow strict layered architecture: Controller → Service → Repository → DbContext
+- Controllers handle HTTP only (no business logic)
+- Services contain ALL business logic
+- Repositories handle ONLY data persistence (no business rules)
+
+## Service Ownership (STRICT)
+- AuthService: authentication, JWT, user identity (passwords ONLY here)
+- ProductService: products, categories, stock (ONLY service allowed to modify stock)
+- BillingService: bills, bill items, payments, lifecycle
+- AdminService: stores, users (read/control only), dashboard, reports
+- NotificationService: OTP and notifications only
+
+## Cross-Service Rules
+- Services MUST communicate via HTTP or events (no shared DB)
+- Do NOT duplicate business logic across services
+- Do NOT assume another service’s data structure
+- Always match exact API contracts (e.g., /api/products not /api/product)
+
+## API Design Rules
+- All routes must start with /api/
+- Use plural naming: /api/products, /api/bills, /api/admin/stores
+- Never expose Entities in APIs (DTOs only)
+- Use typed responses (no object return types)
+
+## DTO & Validation Rules
+- Use DTOs for all request/response models
+- Validate input using DataAnnotations + service-level validation
+- Do NOT pass Entities between layers
+- Service layer must enforce business rules (not controller)
+
+## Exception Handling
+- Avoid exposing internal exception messages for 500 errors
+- Use serializer-based JSON responses (no manual JSON string building)
+
+## BillingService Rules (CRITICAL)
+- Billing is a lifecycle, NOT CRUD
+- Allowed states:
+  Pending → Hold → AwaitingPayment → Finalized → Refunded
+
+- Rules:
+  - Cannot finalize without successful payment
+  - Stock reservation happens BEFORE payment (via ProductService)
+  - Refund must restore stock via ProductService
+  - Use enum for status (no string states)
+
+## ProductService Rules
+- Stock updates ONLY happen in ProductService
+- Stock math (increase/decrease) handled in Service layer only
+- Repository must NOT modify stock logic
+- Always prevent negative stock
+
+## AdminService Rules
+- AdminService is READ + CONTROL layer only
+- Do NOT implement business logic (no stock updates, no billing logic)
+- Dashboard and reports must be computed via other services (no stored aggregates)
+- Do NOT store derived data like dashboard summaries
+
+## Data & DB Rules
+- Add indexes for frequently queried fields (StoreId, CreatedAt, etc.)
+- Enforce uniqueness where required (e.g., SKU + StoreId)
+- Use soft deletes where appropriate
+- Do NOT store computed/derived data unnecessarily
+
+## Event & Messaging Rules
+- Events must include idempotency identifiers (MessageId)
+- Consumers must handle duplicate events safely
+- Do NOT assume event delivery order
+- Use events for cross-service side effects (e.g., billing → stock)
+
+## Performance & Consistency
+- Avoid ToLower() in queries (breaks indexing)
+- Use pagination for large datasets
+- Invalidate cache on mutations (create/update/delete/stock change)
+- Use consistent filtering and query patterns
+
+## Terminal Operations
+- Provide migration commands for manual execution
+- Do NOT auto-run destructive DB commands
+
+## Health Checks
+- Enable RabbitMQ automatic recovery in health checks.

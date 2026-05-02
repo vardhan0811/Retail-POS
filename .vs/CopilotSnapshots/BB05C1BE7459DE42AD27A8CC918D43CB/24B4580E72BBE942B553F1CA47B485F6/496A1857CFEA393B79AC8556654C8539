@@ -1,0 +1,60 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("api/admin/bills")]
+    public class BillController : ControllerBase
+    {
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _config;
+
+        public BillController(IHttpClientFactory httpClientFactory, IConfiguration config)
+        {
+            _httpClientFactory = httpClientFactory;
+            _config = config;
+        }
+
+        [Authorize(Policy = "VIEW_REPORTS")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] Guid? storeId = null)
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+
+            if (Request.Headers.ContainsKey("Authorization"))
+                client.DefaultRequestHeaders.Add("Authorization", Request.Headers["Authorization"].ToString());
+
+            var billingServiceBaseUrl = _config["ServiceUrls:BillingService"] ?? "http://localhost:5003";
+            var url = storeId.HasValue
+                ? $"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/store/{storeId}"
+                : $"{billingServiceBaseUrl.TrimEnd('/')}/api/bills";
+
+            try
+            {
+                var response = await client.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                return new ContentResult
+                {
+                    StatusCode = (int)response.StatusCode,
+                    ContentType = "application/json",
+                    Content = content
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService unavailable" });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService timeout" });
+            }
+        }
+    }
+}

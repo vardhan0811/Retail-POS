@@ -1,0 +1,20 @@
+﻿using Microsoft.EntityFrameworkCore;
+using AdminService.Entities;
+
+namespace AdminService.Data
+{
+    public class AdminDbContext : DbContext
+    {
+        public AdminDbContext(DbContextOptions<AdminDbContext> options) : base(options) { }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<AdminReport> AdminReports { get; set; }
+        // Add other DbSets as needed
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            // Add model configuration here
+        }
+    }
+}

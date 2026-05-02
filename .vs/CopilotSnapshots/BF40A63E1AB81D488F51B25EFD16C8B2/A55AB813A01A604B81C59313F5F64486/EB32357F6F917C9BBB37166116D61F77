@@ -1,0 +1,115 @@
+﻿using BillingService.DTOs;
+using BillingService.Entities;
+using BillingService.Events;
+using BillingService.Repositories;
+
+namespace BillingService.Services
+{
+    public class BillingServices : IBillingService
+    {
+        private readonly IBillingRepository _repository;
+        private readonly IProductClient _productClient;
+        private readonly RabbitMqPublisher _publisher;
+
+        public BillingServices(
+            IBillingRepository repository,
+            IProductClient productClient,
+            RabbitMqPublisher publisher)
+        {
+            _repository = repository;
+            _productClient = productClient;
+            _publisher = publisher;
+        }
+
+        public async Task<object> CreateBillAsync(CreateBillRequest request, Guid userId, Guid storeId)
+        {
+            // ================================
+            // 🔹 1. VALIDATION
+            // ================================
+            if (request.Items == null || !request.Items.Any())
+                throw new Exception("Bill must contain items");
+
+            // ================================
+            // 🔹 2. INITIALIZE BILL
+            // ================================
+            var bill = new Bill
+            {
+                Id = Guid.NewGuid(),
+                StoreId = storeId,
+                UserId = userId,
+                Items = new List<BillItem>()
+            };
+
+            decimal totalAmount = 0;
+            decimal totalTax = 0;
+
+            // ================================
+            // 🔹 3. PROCESS ITEMS
+            // ================================
+            foreach (var item in request.Items)
+            {
+                // 🔥 CALL PRODUCT SERVICE
+                var product = await _productClient.GetProductById(item.ProductId);
+
+                if (product == null)
+                    throw new Exception($"Product {item.ProductId} not found");
+
+                var itemTotal = product.SellingPrice * item.Quantity;
+                var taxAmount = (itemTotal * product.TaxPercentage) / 100;
+
+                bill.Items.Add(new BillItem
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = product.Id,
+                    ProductName = product.Name,
+                    Quantity = item.Quantity,
+                    UnitPrice = product.SellingPrice,
+                    TaxPercentage = product.TaxPercentage,
+                    TotalPrice = itemTotal + taxAmount
+                });
+
+                totalAmount += itemTotal;
+                totalTax += taxAmount;
+            }
+
+            // ================================
+            // 🔹 4. FINAL CALCULATIONS
+            // ================================
+            bill.TotalAmount = totalAmount;
+            bill.TaxAmount = totalTax;
+            bill.FinalAmount = totalAmount + totalTax;
+
+            // ================================
+            // 🔹 5. SAVE TO DATABASE
+            // ================================
+            await _repository.AddAsync(bill);
+
+            // ================================
+            // 🔥 6. PUBLISH EVENT (VERY IMPORTANT)
+            // ================================
+            var billEvent = new BillCreatedEvent
+            {
+                BillId = bill.Id,
+                StoreId = storeId,
+                Items = bill.Items.Select(i => new BillItemEvent
+                {
+                    ProductId = i.ProductId,
+                    Quantity = i.Quantity
+                }).ToList()
+            };
+
+            _publisher.Publish(billEvent, "bill-created");
+
+            // ================================
+            // 🔹 7. RETURN RESPONSE
+            // ================================
+            return new
+            {
+                BillId = bill.Id,
+                bill.TotalAmount,
+                bill.TaxAmount,
+                bill.FinalAmount
+            };
+        }
+    }
+}

@@ -1,0 +1,12 @@
+﻿namespace BillingService.Entities
+{
+    public enum BillStatus
+    {
+        Pending = 0,
+        Hold = 1,
+        Finalized = 2,
+        Refunded = 3,
+        Failed = 4,
+        Confirmed = 5
+    }
+}

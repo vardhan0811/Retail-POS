@@ -1,0 +1,203 @@
+﻿using AuthService.Data;
+using AuthService.DTOs;
+using AuthService.Entities;
+using AuthService.Repositories;
+using Microsoft.EntityFrameworkCore;
+using AuthService.Middleware;
+
+namespace AuthService.Services
+{
+public class AuthServices : IAuthService
+{
+    private readonly IUserRepository _userRepository;
+    private readonly IJwtService _jwtService;
+    private readonly AuthDbContext _context;
+    private readonly RabbitMqPublisher _rabbitMqPublisher;
+    private readonly NotificationClient _notificationClient;
+    private readonly RegistrationCacheService _registrationCacheService;
+
+    public AuthServices(
+        IUserRepository userRepository,
+        IJwtService jwtService,
+        AuthDbContext context,
+        RabbitMqPublisher rabbitMqPublisher,
+        NotificationClient notificationClient,
+        RegistrationCacheService registrationCacheService)
+    {
+        _userRepository = userRepository;
+        _jwtService = jwtService;
+        _context = context;
+        _rabbitMqPublisher = rabbitMqPublisher;
+        _notificationClient = notificationClient;
+        _registrationCacheService = registrationCacheService;
+    }
+        public async Task<bool> VerifyOtpAsync(string email, string otp)
+        {
+            var otpValid = await _notificationClient.VerifyOtpAsync(email, otp);
+            if (!otpValid)
+                return false;
+
+            // if otp is valid then it retrieves the registration details from cache(IMemoryCache)
+            var request = _registrationCacheService.GetRegistration(email);
+            if (request == null)
+                return false;
+
+            // Check again if user already exists (race condition safety)
+            var existingUser = await _userRepository.GetByEmailAsync(email);
+            if (existingUser != null)
+                return false;
+
+            // Re-validate storeId
+            var store = await _context.Stores.FindAsync(request.StoreId);
+            if (store == null || !store.IsActive)
+                throw new NotFoundException("Store not found or inactive");
+
+            // Get default role (Cashier)
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Cashier");
+            if (role == null)
+                throw new NotFoundException("Cashier role not found");
+
+            // Hash password
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            // Create user
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Name = request.Name,
+                Email = request.Email,
+                PasswordHash = passwordHash,
+                RoleId = role.Id,
+                StoreId = request.StoreId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _userRepository.AddAsync(user);
+
+            // Publish UserCreatedEvent to RabbitMQ
+            var evt = new Events.UserCreatedEvent
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                Role = role.Name,
+                CreatedAt = user.CreatedAt
+            };
+            _rabbitMqPublisher.Publish(evt, "user.created");
+
+            // Remove registration from cache
+            _registrationCacheService.RemoveRegistration(email);
+
+            return true;
+        }
+
+        public async Task RegisterAsync(RegisterRequest request)
+        {
+            // Step 1: Check existing user
+            var existingUser = await _userRepository.GetByEmailAsync(request.Email);
+            if (existingUser != null)
+                throw new BusinessException("User already exists");
+
+            // Step 2: Validate storeId
+            var store = await _context.Stores.FindAsync(request.StoreId);
+            if (store == null || !store.IsActive)
+                throw new NotFoundException("Store not found or inactive");
+
+            // Step 3: Send OTP to email
+            var otpSent = await _notificationClient.SendOtpAsync(request.Email);
+            if (!otpSent)
+                throw new BusinessException("Failed to send OTP. Please try again.");
+
+            // Step 4: Store registration details in cache until OTP is verified
+            _registrationCacheService.StoreRegistration(request.Email, request);
+            // User is NOT created yet. Wait for OTP verification.
+        }
+
+        public async Task<AuthResponse> LoginAsync(LoginRequest request)
+        {
+            // 🔹 Step 1: Fetch user with role + permissions
+            var user = await _userRepository
+                .GetUserWithRoleAndPermissions(request.Email);
+
+            if (user == null)
+                throw new NotFoundException("Invalid credentials");
+
+            // 🔹 Step 2: Verify password
+            var isValid = BCrypt.Net.BCrypt.Verify(
+                request.Password,
+                user.PasswordHash);
+
+            if (!isValid)
+                throw new BusinessException("Invalid credentials");
+
+            // 🔹 Step 3: Extract permissions safely
+            var permissions = user.Role?.RolePermissions?
+                .Select(rp => rp.Permission.Name)
+                .ToList() ?? new List<string>();
+
+            // 🔹 Step 4: Generate JWT
+            var token = _jwtService.GenerateToken(user, permissions);
+
+            // 🔹 Step 5: Publish UserLoggedInEvent (for audit/logging)
+            var loginEvent = new Events.UserCreatedEvent // You may want a dedicated event, but using UserCreatedEvent for demo
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                Role = user.Role?.Name,
+                CreatedAt = DateTime.UtcNow
+            };
+            _rabbitMqPublisher.Publish(loginEvent, "user.loggedin");
+
+            // 🔹 Step 6: Return response
+            return new AuthResponse
+            {
+                Token = token,
+                Email = user.Email
+            };
+        }
+
+        public async Task ChangeUserRoleAsync(DTOs.UserRoleChangeRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(request.UserId);
+            if (user == null) throw new NotFoundException("User not found");
+
+            var oldRole = user.Role?.Name;
+            var newRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == request.NewRole);
+            if (newRole == null) throw new NotFoundException("Role not found");
+
+            await _userRepository.ChangeUserRoleAsync(request.UserId, newRole.Id);
+
+            // Publish event
+            var evt = new Events.UserRoleChangedEvent
+            {
+                UserId = user.Id,
+                OldRole = oldRole,
+                NewRole = newRole.Name,
+                ChangedAt = DateTime.UtcNow
+            };
+            _rabbitMqPublisher.Publish(evt, "user.rolechanged");
+        }
+
+        public async Task DeactivateUserAsync(DTOs.UserDeactivateRequest request)
+        {
+            var user = await _userRepository.GetByIdAsync(request.UserId);
+            if (user == null) throw new NotFoundException("User not found");
+
+            await _userRepository.DeactivateUserAsync(request.UserId);
+
+            // Publish event
+            var evt = new Events.UserDeactivatedEvent
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                DeactivatedAt = DateTime.UtcNow
+            };
+            _rabbitMqPublisher.Publish(evt, "user.deactivated");
+        }
+
+        public async Task<List<Store>> GetAllStoresAsync()
+        {
+            return await _context.Stores.ToListAsync();
+        }
+    }
+}

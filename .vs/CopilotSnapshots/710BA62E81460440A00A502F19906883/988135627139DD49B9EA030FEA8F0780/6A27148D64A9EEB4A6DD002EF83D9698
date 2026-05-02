@@ -1,0 +1,10 @@
+﻿namespace ProductService.Entities
+{
+    public class TaxConfiguration
+    {
+        public Guid Id { get; set; }
+
+        public string Name { get; set; }      // GST, VAT
+        public decimal Percentage { get; set; }
+    }
+}

@@ -1,0 +1,39 @@
+﻿using Microsoft.AspNetCore.Http;
+using System;
+using System.Net;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace NotificationService.Middleware
+{
+    public class ExceptionMiddleware
+    {
+        private readonly RequestDelegate _next;
+        public ExceptionMiddleware(RequestDelegate next)
+        {
+            _next = next;
+        }
+        public async Task InvokeAsync(HttpContext context)
+        {
+            try
+            {
+                await _next(context);
+            }
+            catch (Exception ex)
+            {
+                int statusCode = (int)HttpStatusCode.InternalServerError;
+                string message = ex.Message;
+
+                if (ex is CustomExceptions.NotFoundException)
+                    statusCode = (int)HttpStatusCode.NotFound;
+                else if (ex is CustomExceptions.BusinessException)
+                    statusCode = (int)HttpStatusCode.BadRequest;
+
+                context.Response.StatusCode = statusCode;
+                context.Response.ContentType = "application/json";
+                var result = JsonSerializer.Serialize(new { error = message });
+                await context.Response.WriteAsync(result);
+            }
+        }
+    }
+}

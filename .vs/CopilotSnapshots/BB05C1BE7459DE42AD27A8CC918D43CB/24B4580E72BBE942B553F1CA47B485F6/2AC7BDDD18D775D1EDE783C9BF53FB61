@@ -1,0 +1,113 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+namespace AdminService.Controllers
+{
+    [ApiController]
+    [Route("api/admin/reports")]
+    public class ReportController : ControllerBase
+    {
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _config;
+
+        public ReportController(IHttpClientFactory httpClientFactory, IConfiguration config)
+        {
+            _httpClientFactory = httpClientFactory;
+            _config = config;
+        }
+
+        private HttpClient CreateClientWithAuth()
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(5);
+            if (Request.Headers.ContainsKey("Authorization"))
+                client.DefaultRequestHeaders.Add("Authorization", Request.Headers["Authorization"].ToString());
+            return client;
+        }
+
+        [Authorize(Policy = "VIEW_REPORTS")]
+        [HttpGet("sales")]
+        public async Task<IActionResult> GetSales()
+        {
+            // Use BillingService date-range as "sales"
+            var client = CreateClientWithAuth();
+            var billingServiceBaseUrl = _config["ServiceUrls:BillingService"] ?? "http://localhost:5003";
+            try
+            {
+                var response = await client.GetAsync($"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/today");
+                var content = await response.Content.ReadAsStringAsync();
+                return new ContentResult
+                {
+                    StatusCode = (int)response.StatusCode,
+                    ContentType = "application/json",
+                    Content = content
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService unavailable" });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService timeout" });
+            }
+        }
+
+        [Authorize(Policy = "VIEW_REPORTS")]
+        [HttpGet("revenue")]
+        public async Task<IActionResult> GetRevenue()
+        {
+            var client = CreateClientWithAuth();
+            var billingServiceBaseUrl = _config["ServiceUrls:BillingService"] ?? "http://localhost:5003";
+            try
+            {
+                var response = await client.GetAsync($"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/total-revenue");
+                var content = await response.Content.ReadAsStringAsync();
+                return new ContentResult
+                {
+                    StatusCode = (int)response.StatusCode,
+                    ContentType = "application/json",
+                    Content = content
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService unavailable" });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService timeout" });
+            }
+        }
+
+        [Authorize(Policy = "VIEW_REPORTS")]
+        [HttpGet("top-products")]
+        public async Task<IActionResult> GetTopProducts([FromQuery] System.Guid storeId, [FromQuery] int count = 10)
+        {
+            var client = CreateClientWithAuth();
+            var billingServiceBaseUrl = _config["ServiceUrls:BillingService"] ?? "http://localhost:5003";
+            try
+            {
+                var response = await client.GetAsync($"{billingServiceBaseUrl.TrimEnd('/')}/api/bills/store/{storeId}/top-products?count={count}");
+                var content = await response.Content.ReadAsStringAsync();
+                return new ContentResult
+                {
+                    StatusCode = (int)response.StatusCode,
+                    ContentType = "application/json",
+                    Content = content
+                };
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService unavailable" });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(503, new { success = false, message = "BillingService timeout" });
+            }
+        }
+    }
+}

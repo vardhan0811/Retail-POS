@@ -10,5 +10,12 @@ namespace BillingService.DTOs
         public decimal UnitPrice { get; set; }
         public decimal TaxPercentage { get; set; }
         public decimal TotalPrice { get; set; }
+        public bool IsRefundable { get; set; }
+        public int RefundWindowHours { get; set; }
+        public int RefundedQuantity { get; set; }
+        public bool IsRefunded { get; set; }
+        public bool IsRefundEligible { get; set; }
+        public DateTime? RefundDeadline { get; set; }
     }
 }
+

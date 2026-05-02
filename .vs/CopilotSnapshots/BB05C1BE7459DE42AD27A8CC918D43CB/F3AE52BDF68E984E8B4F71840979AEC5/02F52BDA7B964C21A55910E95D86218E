@@ -1,0 +1,30 @@
+﻿using Microsoft.Extensions.Caching.Memory;
+
+namespace AuthService.Services
+{
+    public class PasswordResetCacheService
+    {
+        private readonly IMemoryCache _cache;
+        private static string Key(string email) => $"pwd-reset:{email}";
+
+        public PasswordResetCacheService(IMemoryCache cache)
+        {
+            _cache = cache;
+        }
+
+        public void SetPending(string email)
+        {
+            _cache.Set(Key(email), true, TimeSpan.FromMinutes(10));
+        }
+
+        public bool IsPending(string email)
+        {
+            return _cache.TryGetValue(Key(email), out bool pending) && pending;
+        }
+
+        public void Clear(string email)
+        {
+            _cache.Remove(Key(email));
+        }
+    }
+}

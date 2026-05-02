@@ -1,0 +1,17 @@
+﻿namespace ProductService.DTOs
+{
+    public class UpdateProductRequest
+    {
+        public string Name { get; set; }
+        public string SKU { get; set; }
+        public string Barcode { get; set; }
+
+        public Guid CategoryId { get; set; }
+        public Guid TaxId { get; set; }
+
+        public decimal MRP { get; set; }
+        public decimal SellingPrice { get; set; }
+
+        public bool IsActive { get; set; }
+    }
+}

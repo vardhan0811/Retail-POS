@@ -1,0 +1,15 @@
+﻿{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft.AspNetCore": "Warning"
+        }
+    },
+    "AllowedHosts": "*",
+  "Jwt": {
+    "Key": "",
+    "Issuer": "AuthService",
+    "Audience": "ApiGateway",
+    "Audiences": [ "ApiGateway", "ProductService", "BillingService", "AdminService", "NotificationService", "AuthService" ]
+  }
+}

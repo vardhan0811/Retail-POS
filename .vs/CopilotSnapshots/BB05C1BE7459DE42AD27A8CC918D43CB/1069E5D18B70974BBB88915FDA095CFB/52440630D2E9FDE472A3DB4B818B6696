@@ -1,0 +1,8 @@
+﻿# Copilot Instructions
+
+## Project Guidelines
+- User expects strict layered architecture and robustness standards: avoid exposing entities in APIs, enforce DTO validation, add DB indexes/constraints for query and uniqueness patterns, include idempotency metadata in events, and maintain production-ready consistency across ProductService files.
+- User wants strict DTO boundaries (no entity leakage at API/service boundaries), service-owned business logic (especially stock math), repository focused on persistence, explicit cache invalidation on mutations, typed result models instead of object, and consistency/performance in search and pagination handling.
+
+## Terminal Operations
+- For migration-related terminal operations, provide commands for the user to run manually instead of running those commands through the integrated terminal tool; build commands can still be run by the assistant.

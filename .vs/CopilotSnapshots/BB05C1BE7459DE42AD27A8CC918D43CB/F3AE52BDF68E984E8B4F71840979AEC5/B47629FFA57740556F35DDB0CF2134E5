@@ -1,0 +1,57 @@
+﻿using Microsoft.Extensions.Caching.Memory;
+using System;
+
+namespace AuthService.Services
+{
+    public class RefreshTokenService
+    {
+        private readonly IMemoryCache _cache;
+        private readonly TimeSpan _refreshTokenLifetime = TimeSpan.FromDays(7);
+        private static string UserKey(Guid userId) => $"refresh:user:{userId}";
+        private static string TokenKey(string token) => $"refresh:token:{token}";
+
+        public RefreshTokenService(IMemoryCache cache)
+        {
+            _cache = cache;
+        }
+
+        public string GenerateRefreshToken(Guid userId)
+        {
+            var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+
+            if (_cache.TryGetValue(UserKey(userId), out string? previousToken) && !string.IsNullOrWhiteSpace(previousToken))
+            {
+                _cache.Remove(TokenKey(previousToken));
+            }
+
+            _cache.Set(UserKey(userId), token, _refreshTokenLifetime);
+            _cache.Set(TokenKey(token), userId, _refreshTokenLifetime);
+            return token;
+        }
+
+        public bool ValidateRefreshToken(Guid userId, string token)
+        {
+            if (_cache.TryGetValue(UserKey(userId), out string? cachedToken) && cachedToken == token)
+                return true;
+            return false;
+        }
+
+        public Guid? GetUserIdFromToken(string token)
+        {
+            if (_cache.TryGetValue(TokenKey(token), out Guid userId))
+                return userId;
+
+            return null;
+        }
+
+        public void RemoveRefreshToken(Guid userId)
+        {
+            if (_cache.TryGetValue(UserKey(userId), out string? token) && !string.IsNullOrWhiteSpace(token))
+            {
+                _cache.Remove(TokenKey(token));
+            }
+
+            _cache.Remove(UserKey(userId));
+        }
+    }
+}

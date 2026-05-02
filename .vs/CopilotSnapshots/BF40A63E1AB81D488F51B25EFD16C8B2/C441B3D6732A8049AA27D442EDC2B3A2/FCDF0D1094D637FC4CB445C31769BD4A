@@ -1,0 +1,65 @@
+﻿using AdminService.Entities;
+using AdminService.Repositories;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace AdminService.Services
+{
+    public class UserService : IUserService
+    {
+        private readonly IUserRepository _repo;
+        public UserService(IUserRepository repo) { _repo = repo; }
+        public async Task<User> GetByIdAsync(Guid id) => await _repo.GetByIdAsync(id);
+        public async Task<IEnumerable<User>> GetAllAsync() => await _repo.GetAllAsync();
+        public async Task AddAsync(User user)
+        {
+            await _repo.AddAsync(user);
+            var publisher = (RabbitMqPublisher)Program.ServiceProvider.GetService(typeof(RabbitMqPublisher));
+            if (publisher != null)
+            {
+                var evt = new Events.AdminActionEvent
+                {
+                    AdminId = user.Id, // or the actual admin performing the action if available
+                    Action = "UserCreated",
+                    Details = $"User {user.Email} created.",
+                    ActionAt = DateTime.UtcNow
+                };
+                publisher.Publish(evt, "admin.action");
+            }
+        }
+
+        public async Task UpdateAsync(User user)
+        {
+            await _repo.UpdateAsync(user);
+            var publisher = (RabbitMqPublisher)Program.ServiceProvider.GetService(typeof(RabbitMqPublisher));
+            if (publisher != null)
+            {
+                var evt = new Events.AdminActionEvent
+                {
+                    AdminId = user.Id, // or the actual admin performing the action if available
+                    Action = "UserUpdated",
+                    Details = $"User {user.Email} updated.",
+                    ActionAt = DateTime.UtcNow
+                };
+                publisher.Publish(evt, "admin.action");
+            }
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await _repo.DeleteAsync(id);
+            var publisher = (RabbitMqPublisher)Program.ServiceProvider.GetService(typeof(RabbitMqPublisher));
+            if (publisher != null)
+            {
+                var evt = new Events.AdminActionEvent
+                {
+                    AdminId = id, // or the actual admin performing the action if available
+                    Action = "UserDeleted",
+                    Details = $"User {id} deleted.",
+                    ActionAt = DateTime.UtcNow
+                };
+                publisher.Publish(evt, "admin.action");
+            }
+        }
+    }
+}

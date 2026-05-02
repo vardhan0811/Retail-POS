@@ -1,0 +1,20 @@
+<ng-container *ngIf="isInitialized$ | async; else loading">
+  <router-outlet></router-outlet>
+  <app-toast></app-toast>
+  <app-modal-container></app-modal-container>
+</ng-container>
+
+<ng-template #loading>
+  <div class="auth-init-loader">
+    <div class="brand-shell">
+      <div class="brand-logo-pulse">
+        <img src="https://cdn.pixabay.com/photo/2025/12/08/16/10/bull-10002391_1280.png" class="w-12 h-12 object-contain" alt="Logo">
+      </div>
+      <div class="brand-text uppercase">Retail<span class="text-accent">POS</span></div>
+      <div class="status-wrap">
+        <div class="status-pulse"></div>
+        <span class="status-text">Securing Session...</span>
+      </div>
+    </div>
+  </div>
+</ng-template>

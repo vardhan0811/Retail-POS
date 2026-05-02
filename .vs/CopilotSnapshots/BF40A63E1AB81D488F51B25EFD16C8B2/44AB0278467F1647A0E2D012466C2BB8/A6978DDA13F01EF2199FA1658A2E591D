@@ -1,0 +1,209 @@
+﻿using Microsoft.Extensions.Caching.Memory;
+using ProductService.DTOs;
+using ProductService.Entities;
+using ProductService.Repositories;
+using ProductService.Middleware;
+
+namespace ProductService.Services
+{
+    public class ProductService : IProductService
+    {
+        private readonly IProductRepository _repository;
+        private readonly IMemoryCache _cache;
+
+        // 🔥 Track cache keys (for invalidation)
+        private static readonly List<string> _cacheKeys = new();
+
+        public ProductService(IProductRepository repository, IMemoryCache cache)
+        {
+            _repository = repository;
+            _cache = cache;
+        }
+
+        // 🔥 CREATE
+        public async Task<Product> CreateProductAsync(CreateProductRequest request)
+        {
+            if (request.MRP < request.SellingPrice)
+                throw new Exception("Selling price cannot exceed MRP");
+
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = request.Name,
+                SKU = request.SKU,
+                Barcode = request.Barcode,
+                CategoryId = request.CategoryId,
+                TaxId = request.TaxId,
+                MRP = request.MRP,
+                SellingPrice = request.SellingPrice,
+                StoreId = request.StoreId,
+                IsActive = true
+            };
+
+            await _repository.AddAsync(product);
+
+            // 🔥 CLEAR CACHE AFTER WRITE
+            ClearProductCache();
+
+            return product;
+        }
+
+        // 🔥 GET BY ID
+        public async Task<Product> GetByIdAsync(Guid id)
+        {
+            var product = await _repository.GetByIdAsync(id);
+
+            if (product == null)
+                throw new NotFoundException("Product not found or inactive");
+
+            return product;
+        }
+
+        // 🔥 SEARCH (CACHED)
+        public async Task<IEnumerable<Product>> SearchAsync(string query, Guid storeId)
+        {
+            var cacheKey = GetCacheKey("search", storeId, query);
+
+            if (_cache.TryGetValue(cacheKey, out IEnumerable<Product> cached))
+            {
+                if (!cached.Any())
+                    throw new NotFoundException("Product not found or inactive");
+
+                return cached;
+            }
+
+            var products = await _repository.SearchAsync(query, storeId);
+
+            if (!products.Any())
+                throw new NotFoundException("Product not found or inactive");
+
+            _cache.Set(cacheKey, products, TimeSpan.FromMinutes(5));
+            _cacheKeys.Add(cacheKey);
+
+            return products;
+        }
+
+        // 🔥 UPDATE
+        public async Task UpdateAsync(Guid id, UpdateProductRequest request)
+        {
+            var product = await _repository.GetByIdAsync(id);
+
+            if (product == null)
+                throw new NotFoundException("Product not found or inactive");
+
+            if (request.MRP < request.SellingPrice)
+                throw new Exception("Selling price cannot exceed MRP");
+
+            product.Name = request.Name?.Trim();
+            product.SKU = request.SKU?.Trim();
+            product.Barcode = request.Barcode?.Trim();
+
+            product.CategoryId = request.CategoryId;
+            product.TaxId = request.TaxId;
+
+            product.MRP = request.MRP;
+            product.SellingPrice = request.SellingPrice;
+
+            product.IsActive = request.IsActive;
+
+            await _repository.UpdateAsync(product);
+
+            // 🔥 CLEAR CACHE AFTER UPDATE
+            ClearProductCache();
+        }
+
+        // 🔥 DELETE (SOFT DELETE)
+        public async Task DeleteAsync(Guid id)
+        {
+            var product = await _repository.GetByIdAsync(id);
+
+            if (product == null)
+                throw new NotFoundException("Product not found or inactive");
+
+            product.IsActive = false;
+
+            await _repository.DeleteAsync(product);
+
+            // 🔥 CLEAR CACHE AFTER DELETE
+            ClearProductCache();
+        }
+
+        // 🔥 PAGED + FILTER + SORT + CACHE
+        public async Task<object> GetPagedAsync(
+            Guid storeId,
+            int page,
+            int pageSize,
+            string? search,
+            decimal? minPrice,
+            decimal? maxPrice,
+            string? sortBy)
+        {
+            var cacheKey = GetCacheKey(
+                "paged",
+                storeId,
+                $"{page}_{pageSize}_{search}_{minPrice}_{maxPrice}_{sortBy}"
+            );
+
+            if (_cache.TryGetValue(cacheKey, out object cached))
+            {
+                return cached;
+            }
+
+            var (products, totalCount) = await _repository.GetPagedAsync(
+                storeId, page, pageSize, search, minPrice, maxPrice, sortBy);
+
+            if (!products.Any())
+                throw new NotFoundException("No products found");
+
+            var result = new
+            {
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                Data = products
+            };
+
+            _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+            _cacheKeys.Add(cacheKey);
+
+            return result;
+        }
+
+        // 🔥 CACHE KEY BUILDER
+        private string GetCacheKey(string type, Guid storeId, string extra = "")
+        {
+            return $"products_{type}_{storeId}_{extra}";
+        }
+
+        // 🔥 CACHE INVALIDATION
+        private void ClearProductCache()
+        {
+            foreach (var key in _cacheKeys)
+            {
+                _cache.Remove(key);
+            }
+
+            _cacheKeys.Clear();
+        }
+
+        public async Task ReduceStockAsync(Guid productId, int quantity)
+        {
+            var product = await _repository.GetByIdAsync(productId);
+
+            if (product == null || !product.IsActive)
+                throw new NotFoundException("Product not found or inactive");
+
+            if (quantity <= 0)
+                throw new Exception("Quantity must be greater than zero");
+
+            // Assuming we have a Stock property
+            if (product.Stock < quantity)
+                throw new Exception("Insufficient stock");
+
+            product.Stock -= quantity;
+            await _repository.UpdateAsync(product);
+            // 🔥 CLEAR CACHE AFTER STOCK UPDATE
+            ClearProductCache();
+        }
+    }
+}
