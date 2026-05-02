@@ -53,12 +53,21 @@ It separates **Operational Flow (POS)** and **Control Flow (Admin)** — just li
 `/docs/screenshots/admin-catalog.png`
 ![Catalog](docs/screenshots/admin-catalog.png)
 
+`/docs/screenshots/admin-catalog-edit.png`
+![Catalog Edit](docs/screenshots/admin-catalog-edit.png)
+
 `/docs/screenshots/admin-inventory.png`
 ![Inventory](docs/screenshots/admin-inventory.png)
+
+`/docs/screenshots/admin-inventory-edit.png`
+![Inventory Edit](docs/screenshots/admin-inventory-edit.png)
 
 ---
 
 ### 🔹 4. User & Access Control
+
+`/docs/screenshots/admin-users.png`
+![Users](docs/screenshots/admin-users.png)
 
 `/docs/screenshots/new-user-approval.png`
 ![New User Approval](docs/screenshots/new-user-approval.png)
@@ -69,12 +78,23 @@ It separates **Operational Flow (POS)** and **Control Flow (Admin)** — just li
 `/docs/screenshots/assign-role-by-admin.png`
 ![Assign Role](docs/screenshots/assign-role-by-admin.png)
 
-`/docs/screenshots/admin-users.png`
-![Users](docs/screenshots/admin-users.png)
 
 ---
 
-### 🔹 5. POS Billing Flow (End-to-End)
+### 🔹 5. Reports & Monitoring
+
+`/docs/screenshots/admin-reports.png`
+![Reports](docs/screenshots/admin-reports.png)
+
+---
+### 🔹 6. Refunds Page
+
+`/docs/screenshots/admin-refunds-page.png`
+![Refunds Page](docs/screenshots/admin-refunds-page.png)
+
+---
+
+### 🔹 7. POS Billing Flow (End-to-End)
 
 #### 🖥 Step 1: POS Terminal (Add Products)
 
@@ -91,43 +111,35 @@ It separates **Operational Flow (POS)** and **Control Flow (Admin)** — just li
 `/docs/screenshots/transaction-finalized.png`
 ![Transaction Finalized](docs/screenshots/transaction-finalized.png)
 
-#### 🔍 Step 4: Transaction Details
+#### 📧 Step 4: Digital Receipt Email
 
-`/docs/screenshots/transaction-detail.png`
-![Transaction Detail](docs/screenshots/transaction-detail.png)
+`/docs/screenshots/invoice-email.png`
+![Invoice Email](docs/screenshots/invoice-email.png)
 
-#### 🧾 Step 5: Bills Overview
+#### 📧 Step 5: Digital Receipt EmailSent
 
-`/docs/screenshots/bills.png`
-![Bills](docs/screenshots/bills.png)
+`/docs/screenshots/mail-sent.png`
+![Mail Sent](docs/screenshots/mail-sent.png)
 
-#### 🖨 Step 6: Bill Print
+### 🖨 Step 6: Invoice Management
 
-`/docs/screenshots/bill-print.png`
-![Bill Print](docs/screenshots/bill-print.png)
+`/docs/screenshots/invoice-download.png`
+![Invoice Download](docs/screenshots/invoice-download.png)
 
 #### ⬇ Step 7: Bill Download
 
 `/docs/screenshots/bill-download.png`
 ![Bill Download](docs/screenshots/bill-download.png)
 
-#### 📧 Step 8: Invoice Email Sent
+#### 🔍 Step 8: Transaction Details
 
-`/docs/screenshots/mail-sent.png`
-![Mail Sent](docs/screenshots/mail-sent.png)
+`/docs/screenshots/transaction-detail.png`
+![Transaction Detail](docs/screenshots/transaction-detail.png)
 
----
+#### 🧾 Step 9: Bills Overview
 
-### 🔹 6. Invoice Management
-
-`/docs/screenshots/invoice-print.png`
-![Invoice Print](docs/screenshots/invoice-print.png)
-
-`/docs/screenshots/invoice-download.png`
-![Invoice Download](docs/screenshots/invoice-download.png)
-
-`/docs/screenshots/invoice-email.png`
-![Invoice Email](docs/screenshots/invoice-email.png)
+`/docs/screenshots/bills.png`
+![Bills](docs/screenshots/bills.png)
 
 ---
 
@@ -148,10 +160,12 @@ It separates **Operational Flow (POS)** and **Control Flow (Admin)** — just li
 `/docs/screenshots/settled-refund.png`
 ![Settled Refund](docs/screenshots/settled-refund.png)
 
-#### 📄 Step 4: Refund Receipt
+#### 📄 Step 4: Print Voucher
 
-`/docs/screenshots/refund-receipt.png`
-![Refund Receipt](docs/screenshots/refund-receipt.png)
+`/docs/screenshots/print-voucher.png`
+![Refund Receipt](docs/screenshots/print-voucher.png)
+
+---
 
 #### 💸 Refunded Bills
 
