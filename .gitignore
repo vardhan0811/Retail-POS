@@ -17,6 +17,7 @@
 *.cache
 *.log
 
-# Ignore docs and .github folders
+
+# Ignore .github folder
 .github/
 
