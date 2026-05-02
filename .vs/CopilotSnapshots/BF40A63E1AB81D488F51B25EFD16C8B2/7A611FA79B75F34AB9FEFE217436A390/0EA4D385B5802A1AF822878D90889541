@@ -1,9 +1,0 @@
-﻿using BillingService.DTOs;
-
-namespace BillingService.Services
-{
-    public interface IBillingService
-    {
-        Task<object> CreateBillAsync(CreateBillRequest request, Guid userId, Guid storeId);
-    }
-}

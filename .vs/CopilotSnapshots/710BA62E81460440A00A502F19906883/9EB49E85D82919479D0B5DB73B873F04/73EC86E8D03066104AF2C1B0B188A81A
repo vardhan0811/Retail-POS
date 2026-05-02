@@ -1,8 +1,0 @@
-﻿namespace BillingService.Events
-{
-    public class StockFailedEvent
-    {
-        public Guid BillId { get; set; }
-        public string Reason { get; set; }
-    }
-}

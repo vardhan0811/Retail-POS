@@ -1,8 +1,0 @@
-﻿namespace AdminService.DTOs
-{
-    public class StoreRequest
-    {
-        public string Name { get; set; }
-        public string Location { get; set; }
-    }
-}
