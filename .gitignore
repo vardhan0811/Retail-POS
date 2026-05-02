@@ -18,6 +18,5 @@
 *.log
 
 # Ignore docs and .github folders
-docs/
 .github/
 
