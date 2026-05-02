@@ -328,6 +328,91 @@ The system uses **RabbitMQ (via MassTransit)** for asynchronous, eventual consis
 
 ---
 
+## 🔌 API Reference
+
+> High-level API contract organized by domain (clean + production-style)
+
+---
+
+### 🔐 Authentication
+
+| Method | Endpoint | Description |
+|-------|--------|------------|
+| POST | `/auth/login` | Login with email & password |
+| POST | `/auth/google-login` | Login using Google OAuth |
+| GET  | `/auth/me` | Get current logged-in user |
+| POST | `/auth/logout` | Logout user |
+
+---
+
+### 👥 User Management (Admin)
+
+| Method | Endpoint | Description |
+|-------|--------|------------|
+| GET  | `/admin/users` | Fetch users (filters supported) |
+| POST | `/admin/users/{userId}/approve` | Approve pending user |
+| POST | `/admin/users/{userId}/reject` | Reject user |
+| POST | `/admin/users/{userId}/assign` | Assign role & store |
+
+---
+
+### 🏬 Store Management
+
+| Method | Endpoint | Description |
+|-------|--------|------------|
+| GET  | `/admin/stores` | Get all stores |
+| POST | `/admin/stores` | Create new store |
+
+---
+
+### 📦 Product & Inventory
+
+| Method | Endpoint | Description |
+|-------|--------|------------|
+| GET  | `/products` | Get all products |
+| POST | `/products` | Add new product |
+| POST | `/products/stock/update` | Update stock |
+
+---
+
+### 🧾 Billing (POS)
+
+| Method | Endpoint | Description |
+|-------|--------|------------|
+| POST | `/billing/create` | Create new bill |
+| POST | `/billing/{billId}/items` | Add items to bill |
+| POST | `/billing/{billId}/complete` | Complete payment |
+| GET  | `/billing/{billId}` | Get bill details |
+
+---
+
+### 🔄 Refund Workflow
+
+| Method | Endpoint | Description |
+|-------|--------|------------|
+| POST | `/refund/initiate` | Initiate refund |
+| POST | `/refund/approve` | Approve refund (Admin) |
+| POST | `/refund/settle` | Finalize refund |
+
+---
+
+### 📊 Reports & Dashboard
+
+| Method | Endpoint | Description |
+|-------|--------|------------|
+| GET | `/admin/dashboard` | Dashboard metrics |
+| GET | `/admin/reports` | Reports & analytics |
+
+---
+
+### 🔒 Access Rules
+
+- 👑 **ADMIN** → Full system access  
+- 🧑‍💼 **CASHIER** → POS + assigned store only  
+- ⛔ **UNASSIGNED** → Redirect → `/access-pending`  
+
+---
+
 ## 🔄 System Flow
 
 ### Admin Flow
