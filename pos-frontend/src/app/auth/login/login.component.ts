@@ -118,84 +118,241 @@ declare var google: any;
         </div>
 
         <div class="pos-card w-full p-10 bg-white shadow-2xl transition-shadow duration-300 hover:shadow-primary/5">
-          <form (ngSubmit)="submit()" [formGroup]="form" class="space-y-8" novalidate>
-            <!-- Email Field -->
-            <div class="space-y-1">
-              <div class="floating-label-group">
-                <input
-                  id="email"
-                  type="email"
-                  formControlName="email"
-                  placeholder=" "
-                  autofocus
-                  class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none"
-                />
-                <label for="email">Account Email</label>
+          <div [ngSwitch]="currentView">
+
+            <!-- LOGIN VIEW -->
+            <form *ngSwitchCase="'login'" (ngSubmit)="submit()" [formGroup]="form" class="space-y-6" novalidate>
+              <!-- Email Field -->
+              <div class="space-y-1">
+                <div class="floating-label-group">
+                  <input
+                    id="email"
+                    type="email"
+                    formControlName="email"
+                    placeholder=" "
+                    autofocus
+                    class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none"
+                  />
+                  <label for="email">Account Email</label>
+                  
+                  <div class="input-icon-container" *ngIf="form.controls.email.value">
+                    <button type="button" (click)="clearField('email')" class="icon-btn">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                </div>
+                <p *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1 pt-1">
+                  Email is required
+                </p>
+              </div>
+
+              <!-- Password Field -->
+              <div class="space-y-1">
+                <div class="floating-label-group">
+                  <input
+                    id="password"
+                    [type]="showPassword ? 'text' : 'password'"
+                    formControlName="password"
+                    placeholder=" "
+                    class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none"
+                  />
+                  <label for="password">Security Password</label>
+                  
+                  <div class="input-icon-container">
+                    <button type="button" (click)="togglePassword()" class="icon-btn">
+                      <svg *ngIf="!showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                      <svg *ngIf="showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
+                    </button>
+                  </div>
+                </div>
+                <p *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1 pt-1">
+                  Password is required
+                </p>
+              </div>
+
+              <!-- Forgot Password Link -->
+              <div class="text-right">
+                <button type="button" (click)="setView('forgot')" class="text-xs font-bold text-primary hover:text-accent tracking-wide transition-colors">
+                  Forgot Password?
+                </button>
+              </div>
+
+              <div *ngIf="errorMessage" class="error-message">
+                {{ errorMessage }}
+              </div>
+
+              <div *ngIf="successMessage" class="text-emerald-600 text-xs font-bold mt-2 uppercase tracking-wide">
+                {{ successMessage }}
+              </div>
+
+              <button
+                type="submit"
+                [disabled]="isLoading || form.invalid"
+                class="w-full bg-[#0B0F19] text-white py-5 rounded-full font-bold text-base flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform transition-all active:scale-[0.98] mt-4 group/cta"
+              >
+                <div *ngIf="!isLoading" class="w-6 h-6 bg-white rounded-full flex items-center justify-center group-hover/cta:scale-110 transition-transform">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-[#0B0F19]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                </div>
+                <div *ngIf="isLoading" class="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span>Start Work Session</span>
+              </button>
+
+              <!-- Google Sign-In Integration -->
+              <div class="google-btn-container">
+                <div id="google-login-btn" class="google-btn-wrapper" [class.opacity-0]="!isGoogleConfigLoaded"></div>
                 
-                <div class="input-icon-container" *ngIf="form.controls.email.value">
-                  <button type="button" (click)="clearField('email')" class="icon-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
+                <div *ngIf="!isGoogleConfigLoaded && !googleLoadFailed" class="google-fallback-text">
+                  Initializing Secure Auth...
+                </div>
+
+                <div *ngIf="googleLoadFailed" class="text-xs text-red-500 font-bold mt-2 uppercase tracking-tighter">
+                  Auth Service Unavailable
                 </div>
               </div>
-              <p *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1 pt-1">
-                Email is required
-              </p>
-            </div>
+            </form>
 
-            <!-- Password Field -->
-            <div class="space-y-1">
-              <div class="floating-label-group">
-                <input
-                  id="password"
-                  [type]="showPassword ? 'text' : 'password'"
-                  formControlName="password"
-                  placeholder=" "
-                  class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none"
-                />
-                <label for="password">Security Password</label>
-                
-                <div class="input-icon-container">
-                  <button type="button" (click)="togglePassword()" class="icon-btn">
-                    <svg *ngIf="!showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    <svg *ngIf="showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
-                  </button>
+            <!-- FORGOT PASSWORD VIEW -->
+            <form *ngSwitchCase="'forgot'" (ngSubmit)="submitForgot()" [formGroup]="forgotForm" class="space-y-6" novalidate>
+              <div class="text-center">
+                <h2 class="text-lg font-extrabold text-primary uppercase tracking-wider">Reset Password</h2>
+                <p class="text-xs text-muted/60 mt-1">Enter your account email to request an OTP code.</p>
+              </div>
+
+              <!-- Email Field -->
+              <div class="space-y-1">
+                <div class="floating-label-group">
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    formControlName="email"
+                    placeholder=" "
+                    autofocus
+                    class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none"
+                  />
+                  <label for="forgot-email">Account Email</label>
+                </div>
+                <p *ngIf="forgotForm.controls.email.touched && forgotForm.controls.email.invalid" class="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1 pt-1">
+                  Valid email is required
+                </p>
+              </div>
+
+              <div *ngIf="errorMessage" class="error-message">
+                {{ errorMessage }}
+              </div>
+
+              <div class="flex gap-4">
+                <button
+                  type="button"
+                  (click)="setView('login')"
+                  class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-5 rounded-full font-bold text-sm transition-all"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  [disabled]="isLoading || forgotForm.invalid"
+                  class="flex-1 bg-[#0B0F19] text-white py-5 rounded-full font-bold text-base flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50"
+                >
+                  <span>Request OTP</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- RESET PASSWORD VIEW -->
+            <form *ngSwitchCase="'reset'" (ngSubmit)="submitReset()" [formGroup]="resetForm" class="space-y-6" novalidate>
+              <div class="text-center">
+                <h2 class="text-lg font-extrabold text-primary uppercase tracking-wider">Enter OTP Code</h2>
+                <p class="text-xs text-muted/60 mt-1">Please check your inbox for the 6-digit OTP code.</p>
+              </div>
+
+              <!-- Email Field (Readonly) -->
+              <div class="space-y-1">
+                <div class="floating-label-group">
+                  <input
+                    id="reset-email"
+                    type="email"
+                    formControlName="email"
+                    placeholder=" "
+                    class="w-full px-5 py-5 bg-slate-100 border-2 border-slate-100 rounded-2xl shadow-sm text-sm font-bold outline-none leading-none cursor-not-allowed"
+                    readonly
+                  />
+                  <label for="reset-email">Account Email</label>
                 </div>
               </div>
-              <p *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1 pt-1">
-                Password is required
-              </p>
-            </div>
 
-            <div *ngIf="errorMessage" class="error-message">
-              {{ errorMessage }}
-            </div>
-
-            <button
-              type="submit"
-              [disabled]="isLoading || form.invalid"
-              class="w-full bg-[#0B0F19] text-white py-5 rounded-full font-bold text-base flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform transition-all active:scale-[0.98] mt-4 group/cta"
-            >
-              <div *ngIf="!isLoading" class="w-6 h-6 bg-white rounded-full flex items-center justify-center group-hover/cta:scale-110 transition-transform">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-[#0B0F19]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-              </div>
-              <div *ngIf="isLoading" class="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              <span>Start Work Session</span>
-            </button>
-
-            <!-- Google Sign-In Integration -->
-            <div class="google-btn-container">
-              <div id="google-login-btn" class="google-btn-wrapper" [class.opacity-0]="!isGoogleConfigLoaded"></div>
-              
-              <div *ngIf="!isGoogleConfigLoaded && !googleLoadFailed" class="google-fallback-text">
-                Initializing Secure Auth...
+              <!-- OTP Code Field -->
+              <div class="space-y-1">
+                <div class="floating-label-group">
+                  <input
+                    id="reset-otp"
+                    type="text"
+                    formControlName="otp"
+                    placeholder=" "
+                    maxlength="6"
+                    autofocus
+                    class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none tracking-widest text-center"
+                  />
+                  <label for="reset-otp">6-Digit OTP</label>
+                </div>
+                <p *ngIf="resetForm.controls.otp.touched && resetForm.controls.otp.invalid" class="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1 pt-1">
+                  OTP must be 6 digits
+                </p>
               </div>
 
-              <div *ngIf="googleLoadFailed" class="text-xs text-red-500 font-bold mt-2 uppercase tracking-tighter">
-                Auth Service Unavailable
+              <!-- New Password Field -->
+              <div class="space-y-1">
+                <div class="floating-label-group">
+                  <input
+                    id="reset-new-password"
+                    [type]="showPassword ? 'text' : 'password'"
+                    formControlName="newPassword"
+                    placeholder=" "
+                    class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none"
+                  />
+                  <label for="reset-new-password">New Security Password</label>
+                </div>
+                <p *ngIf="resetForm.controls.newPassword.touched && resetForm.controls.newPassword.invalid" class="text-[10px] font-black text-red-500 uppercase tracking-widest pl-1 pt-1">
+                  Password must be at least 8 characters
+                </p>
               </div>
-            </div>
-          </form>
+
+              <!-- Confirm Password Field -->
+              <div class="space-y-1">
+                <div class="floating-label-group">
+                  <input
+                    id="reset-confirm-password"
+                    [type]="showPassword ? 'text' : 'password'"
+                    formControlName="confirmPassword"
+                    placeholder=" "
+                    class="w-full px-5 py-5 bg-slate-50 border-2 border-slate-100 focus:border-primary/20 focus:bg-white rounded-2xl shadow-sm transition-all text-sm font-bold outline-none leading-none"
+                  />
+                  <label for="reset-confirm-password">Confirm Password</label>
+                </div>
+              </div>
+
+              <div *ngIf="errorMessage" class="error-message">
+                {{ errorMessage }}
+              </div>
+
+              <div class="flex gap-4">
+                <button
+                  type="button"
+                  (click)="setView('forgot')"
+                  class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-5 rounded-full font-bold text-sm transition-all"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  [disabled]="isLoading || resetForm.invalid"
+                  class="flex-1 bg-[#0B0F19] text-white py-5 rounded-full font-bold text-base flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50"
+                >
+                  <span>Reset Password</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
 
           <div class="mt-8 text-center">
             <p class="text-[10px] font-bold text-muted/60 uppercase tracking-[0.2em] leading-relaxed" id="auth-legal-notice">
@@ -219,6 +376,17 @@ export class LoginComponent implements OnInit, OnDestroy {
     password: ['', [Validators.required]],
   });
 
+  forgotForm = this.fb.nonNullable.group({
+    email: ['', [Validators.required, Validators.email]],
+  });
+
+  resetForm = this.fb.nonNullable.group({
+    email: ['', [Validators.required, Validators.email]],
+    otp: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]],
+    newPassword: ['', [Validators.required, Validators.minLength(8)]],
+    confirmPassword: ['', [Validators.required]],
+  });
+
   username: string = '';
 
   isLoading = false;
@@ -226,7 +394,9 @@ export class LoginComponent implements OnInit, OnDestroy {
   googleLoadFailed = false; // Graceful fallback flag
   clientId: string | null = null;
   errorMessage = '';
+  successMessage = '';
   showPassword = false;
+  currentView: 'login' | 'forgot' | 'reset' = 'login';
 
   ngOnInit(): void {
     // Phase 1: Redirect already logged-in users after state is ready
@@ -273,6 +443,81 @@ export class LoginComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  setView(view: 'login' | 'forgot' | 'reset'): void {
+    this.currentView = view;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.cdr.detectChanges();
+  }
+
+  submitForgot(): void {
+    if (this.forgotForm.invalid) {
+      this.forgotForm.markAllAsTouched();
+      return;
+    }
+    this.isLoading = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.cdr.detectChanges();
+
+    const email = this.forgotForm.controls.email.value;
+    this.authService.forgotPassword(email)
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.detectChanges();
+        }),
+        takeUntil(this.destroy$)
+      )
+      .subscribe({
+        next: () => {
+          this.successMessage = 'OTP code sent successfully to ' + email;
+          this.resetForm.controls.email.setValue(email);
+          this.setView('reset');
+        },
+        error: (err) => {
+          this.errorMessage = err.error?.message || err.message || 'Failed to request password reset.';
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  submitReset(): void {
+    if (this.resetForm.invalid) {
+      this.resetForm.markAllAsTouched();
+      return;
+    }
+    const { email, otp, newPassword, confirmPassword } = this.resetForm.getRawValue();
+    if (newPassword !== confirmPassword) {
+      this.errorMessage = 'Passwords do not match.';
+      return;
+    }
+
+    this.isLoading = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.cdr.detectChanges();
+
+    this.authService.resetPassword({ email, otp, newPassword, confirmPassword })
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+          this.cdr.detectChanges();
+        }),
+        takeUntil(this.destroy$)
+      )
+      .subscribe({
+        next: () => {
+          this.successMessage = 'Password reset successfully! Please log in.';
+          this.setView('login');
+        },
+        error: (err) => {
+          this.errorMessage = err.error?.message || err.message || 'Failed to reset password.';
+          this.cdr.detectChanges();
+        }
+      });
   }
 
   private isGoogleInitialized = false;

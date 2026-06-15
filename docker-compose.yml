@@ -37,6 +37,7 @@ services:
       - RabbitMQ__Host=rabbitmq
       - ServiceUrls__NotificationService=http://notification-service:5005
       - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+      - Google__ClientId=${GOOGLE_CLIENT_ID:-}
     depends_on:
       - sqlserver
       - rabbitmq
@@ -115,6 +116,11 @@ services:
       - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=RetailPOS_NotificationService;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;
       - RabbitMQ__Host=rabbitmq
       - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+      - OtpSettings__HashKey=YOUR_SECRET_OTP_HASH_KEY_12345_ABCDE
+      - EmailSettings__FromEmail=${SMTP_EMAIL:-admin@test.com}
+      - EmailSettings__AppPassword=${SMTP_PASSWORD:-password}
+      - EmailSettings__SmtpHost=${SMTP_HOST:-smtp.gmail.com}
+      - EmailSettings__SmtpPort=${SMTP_PORT:-587}
     depends_on:
       - sqlserver
       - rabbitmq

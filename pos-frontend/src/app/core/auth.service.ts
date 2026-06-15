@@ -177,6 +177,18 @@ export class AuthService {
     );
   }
 
+  forgotPassword(email: string): Observable<void> {
+    return this.authApi.forgotPassword(email).pipe(
+      map(() => void 0)
+    );
+  }
+
+  resetPassword(payload: any): Observable<void> {
+    return this.authApi.resetPassword(payload).pipe(
+      map(() => void 0)
+    );
+  }
+
   private profileCache: import('./auth.models').UserProfile | null = null;
 
   getProfile(forceRefresh = false): Observable<import('./auth.models').UserProfile> {

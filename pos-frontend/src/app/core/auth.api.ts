@@ -71,5 +71,13 @@ export class AuthApi {
   changePassword(payload: any): Observable<ApiResponse<string>> {
     return this.api.client.post<ApiResponse<string>>(this.api.url('/api/Auth/change-password'), payload);
   }
+
+  forgotPassword(email: string): Observable<ApiResponse<string>> {
+    return this.api.client.post<ApiResponse<string>>(this.api.url('/api/Auth/forgot-password'), { email });
+  }
+
+  resetPassword(payload: any): Observable<ApiResponse<string>> {
+    return this.api.client.post<ApiResponse<string>>(this.api.url('/api/Auth/reset-password'), payload);
+  }
 }
 
