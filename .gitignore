@@ -24,3 +24,6 @@
 .vs/
 .vscode/
 
+# Ignore Office temporary files (e.g. ~${filename}.docx)
+~$*
+
