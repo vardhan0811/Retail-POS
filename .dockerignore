@@ -1,0 +1,11 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin/
+**/obj/
+**/Logs/
+**/node_modules/
+**/dist/
+pos-frontend/.angular/
+pos-frontend/node_modules/
+pos-frontend/dist/

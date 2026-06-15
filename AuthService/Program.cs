@@ -103,9 +103,10 @@ namespace AuthService
             builder.Services.AddSingleton<PasswordResetCacheService>();
             builder.Services.AddScoped<RefreshTokenService>();
 
+            var notificationServiceUrl = builder.Configuration["ServiceUrls:NotificationService"] ?? "http://localhost:5005";
             builder.Services.AddHttpClient<NotificationClient>(client =>
             {
-                client.BaseAddress = new Uri("http://localhost:5005");
+                client.BaseAddress = new Uri(notificationServiceUrl.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(5);
             });
 
@@ -152,7 +153,22 @@ namespace AuthService
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-                await db.Database.MigrateAsync();
+                int retries = 10;
+                while (retries > 0)
+                {
+                    try
+                    {
+                        await db.Database.MigrateAsync();
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        retries--;
+                        if (retries == 0) throw;
+                        Log.Warning(ex, "Database migration failed. Retrying in 5 seconds ({Retries} retries left)...", retries);
+                        await Task.Delay(5000);
+                    }
+                }
                 await DbSeeder.SeedAsync(db);
             }
 

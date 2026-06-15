@@ -9,7 +9,8 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
-builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
+var ocelotFileName = Environment.GetEnvironmentVariable("IN_DOCKER") == "true" ? "ocelot.docker.json" : "ocelot.json";
+builder.Configuration.AddJsonFile(ocelotFileName, optional: false, reloadOnChange: true);
 
 // Add CORS policy
 builder.Services.AddCors(options =>

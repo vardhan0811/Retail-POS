@@ -126,6 +126,27 @@ namespace AdminService
 
             var app = builder.Build();
 
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
+                int retries = 10;
+                while (retries > 0)
+                {
+                    try
+                    {
+                        db.Database.Migrate();
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        retries--;
+                        if (retries == 0) throw;
+                        Log.Warning(ex, "Database migration failed. Retrying in 5 seconds ({Retries} retries left)...", retries);
+                        Thread.Sleep(5000);
+                    }
+                }
+            }
+
             app.UseMiddleware<ExceptionMiddleware>();
             app.UseHttpsRedirection();
 

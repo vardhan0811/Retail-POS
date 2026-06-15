@@ -1,0 +1,156 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: pos-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourSecurePassword123!
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: pos-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  auth-service:
+    image: auth-service:latest
+    build:
+      context: .
+      dockerfile: AuthService/Dockerfile
+    container_name: auth-service
+    ports:
+      - "5001:5001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5001
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=RetailPOS_Auth;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - ServiceUrls__NotificationService=http://notification-service:5005
+      - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+    depends_on:
+      - sqlserver
+      - rabbitmq
+
+  product-service:
+    image: product-service:latest
+    build:
+      context: .
+      dockerfile: ProductService/Dockerfile
+    container_name: product-service
+    ports:
+      - "5002:5002"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5002
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=RetailPOS_Product;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+    depends_on:
+      - sqlserver
+      - rabbitmq
+
+  billing-service:
+    image: billing-service:latest
+    build:
+      context: .
+      dockerfile: BillingService/Dockerfile
+    container_name: billing-service
+    ports:
+      - "5003:5003"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5003
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=RetailPOS_Billing;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - ServiceUrls__ProductService=http://product-service:5002
+      - ServiceUrls__AdminService=http://admin-service:5004
+      - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+    depends_on:
+      - sqlserver
+      - rabbitmq
+      - product-service
+      - admin-service
+
+  admin-service:
+    image: admin-service:latest
+    build:
+      context: .
+      dockerfile: AdminService/Dockerfile
+    container_name: admin-service
+    ports:
+      - "5004:5004"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5004
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=RetailPOS_Admin;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - ServiceUrls__AuthService=http://auth-service:5001
+      - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+    depends_on:
+      - sqlserver
+      - rabbitmq
+      - auth-service
+
+  notification-service:
+    image: notification-service:latest
+    build:
+      context: .
+      dockerfile: NotificationService/Dockerfile
+    container_name: notification-service
+    ports:
+      - "5005:5005"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5005
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=RetailPOS_NotificationService;User Id=sa;Password=YourSecurePassword123!;TrustServerCertificate=True;
+      - RabbitMQ__Host=rabbitmq
+      - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+    depends_on:
+      - sqlserver
+      - rabbitmq
+
+  api-gateway:
+    image: api-gateway:latest
+    build:
+      context: .
+      dockerfile: ApiGateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - IN_DOCKER=true
+      - Jwt__Key=THIS_IS_SUPER_SECRET_KEY_1234567890_DOCKER_ENVIRONMENT_98765
+    depends_on:
+      - auth-service
+      - product-service
+      - billing-service
+      - admin-service
+      - notification-service
+
+  pos-frontend:
+    image: pos-frontend:latest
+    build:
+      context: ./pos-frontend
+      dockerfile: Dockerfile
+    container_name: pos-frontend
+    ports:
+      - "4200:4200"
+    environment:
+      - PORT=4200
+    depends_on:
+      - api-gateway
+
+volumes:
+  sqlserver-data:
